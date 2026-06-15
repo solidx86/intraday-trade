@@ -1,0 +1,62 @@
+{
+  "skill_name": "weekly-trade-review",
+  "notes": "This skill reads a trade journal directory rather than screenshots, so each eval points the skill at a synthetic fixture journal under evals/fixtures/<case>/trade-journal/ (paths are relative to the weekly-trade-review-skill/ directory). The real data/trade-journal/ has too few entries to exercise a weekly review, hence the fixtures. Outputs are subjective drill-sergeant/head-coach prose; the assertions below cover structural compliance with SKILL.md (verdict logic, the too-thin gate, the file write, escalation language). Qualitative review is in the eval viewer.",
+  "evals": [
+    {
+      "id": 1,
+      "label": "Week with a repeat offender (FOMO x3), no prior review",
+      "prompt": "Run my weekly review. Use the trade journal at evals/fixtures/week-repeat-offender/trade-journal/ and treat the review week as 2026-05-04 to 2026-05-10. There is no prior review on file.",
+      "files": [],
+      "ground_truth_summary": "4 journaled trades: NVDA L/Loss/D (FOMO, chased_breakout, weak_RS), AMD L/Loss/D (FOMO, revenge, no_plan), TSLA S/Win/B (clean_win, correct_sentiment_read, patient_entry), AAPL L/BE/C (FOMO, early_exit, chased_breakout). FOMO appears on 3 of 4 — a repeat offender. No prior weekly/ review on file, so the 'Last Week's Order' verdict is N/A. Avg process grade should land around D+/C− (GPA ~1.5: 1.0+1.0+3.0+2.0 = 7.0/4 = 1.75 -> C−). Win rate 25% (1/4), flagged informational only. The single discipline focus for next week should target FOMO / the chase-vs-pullback impulse (and ideally the upstream morning routine / pre-trade checklist). The review must be persisted to trade-journal/weekly/2026-W19_weekly.md (the ISO week containing 2026-05-04..2026-05-10 is 2026-W19) and the response should state that path. Head-coach section should note shorts (TSLA) are graded above the long chases.",
+      "assertions": [
+        {"type": "contains_any", "values": ["N/A", "first review", "no prior"], "field": "verdict", "note": "no prior review -> verdict must be N/A, not a fabricated HELD/SLIPPED"},
+        {"type": "contains", "value": "FOMO", "note": "FOMO must be named as the dominant theme"},
+        {"type": "contains_any", "values": ["repeat offender", "3", "three", "again and again", "every losing trade"], "field": "themes", "note": "must flag FOMO as recurring (>=3x), not a one-off"},
+        {"type": "contains_any", "values": ["routine", "checklist", "before any entry", "before you click", "three-light", "three light"], "field": "single_discipline_focus", "note": "next-week order should attack the FOMO/chase impulse, ideally via the pre-trade routine"},
+        {"type": "section_present", "value": "Stats", "note": "stats section required (>=3 trades, so a full review)"},
+        {"type": "section_present", "value": "Single Discipline Focus", "note": "must end with exactly one order for next week"},
+        {"type": "contains_any", "values": ["weekly/2026-W19", "2026-W19_weekly.md", "trade-journal/weekly/"], "field": "saved_path", "note": "must persist the review to trade-journal/weekly/ and state the path"},
+        {"type": "must_not_contain", "value": "P&L", "field": "ranked_by", "note": "must not rank or grade the week by dollars"}
+      ]
+    },
+    {
+      "id": 2,
+      "label": "Improvement week — prior order HELD, but still issue a fresh order",
+      "prompt": "Run my weekly review. Use the trade journal at evals/fixtures/week-improvement/trade-journal/ and treat the review week as 2026-05-11 to 2026-05-17.",
+      "files": [],
+      "ground_truth_summary": "There is a prior review at trade-journal/weekly/2026-W19_weekly.md whose order was: 'Before any entry: name the price-structure trigger out loud, confirm the sector ETF agrees with my direction, and confirm my ticker is stronger than its sector — three lights or no trade.' This week's 4 entries (SMH L/BE/A−, IGV L/Win/A, XLF S/Win/B+, QQQ L/Loss/B−) all explicitly run that three-light check, contain no FOMO/chased_breakout/weak_RS tags, and several carry correct_RS_read / patient_entry. So the verdict is HELD, with evidence. Avg process grade ~B (GPA: 3.7+4.0+3.3+2.7 = 13.7/4 = 3.4 -> B/B+). Despite HELD, the review must still issue a fresh order — the natural one is about stop discipline (SMH stop ~1.5x guideline, QQQ SL_too_wide, XLF a 1.9 R:R) and/or pre-defining the invalidation trigger before entry. Must NOT go soft just because the week was good. New review persisted to trade-journal/weekly/2026-W20_weekly.md. Head-coach section present.",
+      "assertions": [
+        {"type": "contains", "value": "HELD", "field": "verdict", "note": "prior order was followed -> verdict HELD"},
+        {"type": "contains_any", "values": ["three lights", "three-light", "trigger", "sector ETF", "stronger than its sector"], "field": "verdict_evidence", "note": "verdict must quote/reference the prior order and cite evidence it stuck"},
+        {"type": "section_present", "value": "Single Discipline Focus", "note": "must STILL issue a fresh order despite HELD"},
+        {"type": "contains_any", "values": ["stop", "SL", "ATR", "size down", "invalidation trigger", "R:R", "1.9"], "field": "single_discipline_focus", "note": "fresh order should target the residual weakness (stop width / R:R floor / pre-defined invalidation)"},
+        {"type": "section_present", "value": "Setup-Selection Review", "note": "head-coach setup-selection section required"},
+        {"type": "must_not_contain_any", "values": ["nothing to fix", "no order this week", "take the week off", "you've got it figured out"], "field": "tone", "note": "must not go soft after a HELD week"},
+        {"type": "contains_any", "values": ["weekly/2026-W20", "2026-W20_weekly.md", "trade-journal/weekly/"], "field": "saved_path", "note": "must persist and state the path"}
+      ]
+    },
+    {
+      "id": 3,
+      "label": "Too-thin week — only 1 trade in range, must decline a full review",
+      "prompt": "Run my weekly review. Use the trade journal at evals/fixtures/week-too-thin/trade-journal/ and treat the review week as 2026-05-18 to 2026-05-24.",
+      "files": [],
+      "ground_truth_summary": "Only 1 journaled trade in range (MSFT no-trade/disciplined skip). Per SKILL.md the too-thin gate triggers below 3 trades: respond short (<=~120 words), state the trade count, explain a weekly review needs a real sample, tell Solid to come back at week-end (or run the mentor on any un-journaled trades). It should NOT moralize about the low trade count (a disciplined-skip-heavy light week is legitimate). No Stats section, no Themes section, no Single Discipline Focus order, no file written to weekly/.",
+      "assertions": [
+        {"type": "short_response", "max_words": 130, "note": "must be a short decline, not a full review"},
+        {"type": "contains_any", "values": ["1 trade", "one trade", "only one", "single trade", "not enough"], "note": "must name the count / insufficiency"},
+        {"type": "must_not_contain", "value": "Stats", "note": "no stats section on a declined review"},
+        {"type": "must_not_contain_any", "values": ["Single Discipline Focus", "order for next week"], "note": "no next-week order on a declined review"},
+        {"type": "must_not_contain_any", "values": ["weekly/2026-W21", "_weekly.md written", "saved the review"], "note": "must NOT write a review file when declining"}
+      ]
+    }
+  ],
+  "iteration_history": [
+    {
+      "iteration": 0,
+      "date": "2026-05-12",
+      "context": "Skill created (standalone, split out of intraday-trade-mentor's old Weekly/Monthly Summary mode). Eval set authored alongside it with three synthetic fixture journals (repeat-offender / improvement / too-thin). Not yet run through the skill-creator runner.",
+      "findings": [],
+      "notes": "First run should validate: (a) verdict logic reads trade-journal/weekly/ correctly, (b) the <3-trade gate fires and writes nothing, (c) the review file lands in trade-journal/weekly/ with the right ISO-week name, (d) HELD weeks still get a fresh order. Expand fixtures as real weeks accumulate (shorts-heavy weeks, multi-week recurrences, catalyst weeks)."
+    }
+  ]
+}

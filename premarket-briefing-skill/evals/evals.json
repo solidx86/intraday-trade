@@ -1,0 +1,91 @@
+{
+  "skill_name": "premarket-briefing",
+  "validator": "validators/validate_briefing.py",
+  "validator_usage": "python3 validators/validate_briefing.py --briefing <path/to/premarket.md> [--json-out <path>]",
+  "evals": [
+    {
+      "id": 1,
+      "name": "explicit-trigger-phrase",
+      "prompt": "premarket briefing",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output file is created at data/trade-journal/daily/YYYY-MM-DD/premarket.md with a valid date filename",
+          "type": "file_exists"
+        },
+        {
+          "text": "Briefing header contains a US trading date in YYYY-MM-DD form",
+          "type": "regex_match"
+        },
+        {
+          "text": "Briefing contains all 7 required section headings: '## 1.1', '## 1.2', '## 1.3', '## 1.4', '## Quick Summary', '## Market News & Catalysts', '## Global Market Spillover'",
+          "type": "structural"
+        },
+        {
+          "text": "Section 1.1 includes an explicit RISK-ON or RISK-OFF verdict",
+          "type": "structural"
+        },
+        {
+          "text": "Section 1.2 either lists events with HIGH/MED/LOW impact labels, or states 'Light calendar today — no major data releases.'",
+          "type": "structural"
+        },
+        {
+          "text": "Section 1.4 (Portfolio News) lists only watchlist tickers that have a news item or catalyst, grouped under the watchlist's theme sub-headers as bolded tokens **TICKER**; no 'Quiet today.' filler lines, and theme groups with no news are omitted.",
+          "type": "qualitative"
+        },
+        {
+          "text": "Global Spillover section covers Asia (Nikkei, Hang Seng, KOSPI, Shanghai), Europe (DAX, FTSE, STOXX), and USD/JPY",
+          "type": "structural"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "casual-trigger",
+      "prompt": "what should I watch in the market today",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Skill is invoked (output follows the briefing template structure, not a freeform answer)",
+          "type": "structural"
+        },
+        {
+          "text": "Output file is created at data/trade-journal/daily/YYYY-MM-DD/premarket.md",
+          "type": "file_exists"
+        },
+        {
+          "text": "All 7 required section headings present",
+          "type": "structural"
+        },
+        {
+          "text": "Section 1.4 (Portfolio News) reports only watchlist tickers with news or a catalyst, grouped by theme; quiet tickers are dropped",
+          "type": "qualitative"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "indirect-trigger",
+      "prompt": "brief me on the upcoming US session",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Skill is invoked",
+          "type": "structural"
+        },
+        {
+          "text": "Computed US trading date is forward-looking (next session, not a past date) — verifiable by checking the date in the header against the eval run date",
+          "type": "structural"
+        },
+        {
+          "text": "All 7 required section headings present",
+          "type": "structural"
+        },
+        {
+          "text": "Briefing voice is plain English (no jargon like 'dot plot', 'hawkish bias', 'risk-parity rotation' without explanation)",
+          "type": "qualitative"
+        }
+      ]
+    }
+  ]
+}

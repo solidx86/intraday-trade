@@ -1,0 +1,143 @@
+{
+  "skill_name": "intraday-trade-mentor",
+  "notes": "Real trades from 2026-05-11 US session. Outputs are subjective (drill-sergeant critique) — quantitative checks below cover structural compliance with SKILL.md spec; qualitative review is in eval-viewer.",
+  "evals": [
+    {
+      "id": 1,
+      "label": "CRM long against daily downtrend — losing trade (Triad-complete submission, expected D-F)",
+      "prompt": "review my trade. CRM long, entry 180.30, SL 179.50 (under 180 daily support), no PT pre-set — I was going to exit if 180 fails and stays below for 2 bars. Full stop-out at 177.49. Why CRM: catalyst is none specific — IGV had pulled back over the prior days and I was looking for a recovery bid at the round-number 180 daily support level; RS read at click: CRM looked strong because the first 3m candle pushed through PDH 181.80 on heavy volume; pattern: P3 rebound at daily 180 support. Sector ETF watched: I checked QQQ but didn't check IGV. Trail rule: not pre-written — decided in my head to exit on 180 break + 2-bar close below.",
+      "files": [
+        "evals/assets/crm_3col.png",
+        "evals/assets/session_4cell_igv.png"
+      ],
+      "ground_truth_summary": "P3 long against daily downtrend, into falling IGV sector, with VIX rising. User-submitted Triad has catalyst leg explicitly weak ('none specific' + 'recovery bid' is a hope, not a catalyst), RS leg contradicted by chart reality (CRM bled through 180 while IGV later V-recovered without CRM), pattern leg present. Triad partial/fail → grade cap at B. Then Q1 (long against daily downtrend), Q4 (VIX up + IGV falling), Q5 (CRM weaker than IGV) all fail, dropping grade to D or F. L002 slip (looked at QQQ not IGV per user own statement). L033 slip (trail rule was 'in my head' not pre-written).",
+      "assertions": [
+        {"type": "contains_any", "values": ["F", "D"], "field": "grade", "note": "process grade should be D or F"},
+        {"type": "contains_any", "values": ["Fail", "FAIL", "fail"], "field": "Q1", "note": "trend check must fail — long against daily downtrend"},
+        {"type": "contains_any", "values": ["Fail", "FAIL", "fail"], "field": "relative_strength", "note": "CRM weaker than IGV must be flagged"},
+        {"type": "contains_any", "values": ["Fail", "FAIL", "Partial", "fail"], "field": "trade_quality_triad", "note": "Triad row must register catalyst leg as weak/fail"},
+        {"type": "contains_any", "values": ["IGV", "sector", "software"], "note": "sector ETF reference required"},
+        {"type": "contains_any", "values": ["L002"], "note": "L002 (sector ETF before broad index) should be cited — user explicitly didn't check IGV"},
+        {"type": "contains_any", "values": ["L033", "trail rule", "pre-written"], "note": "L033 trail-rule slip should be cited — user admitted 'not pre-written'"},
+        {"type": "section_present", "value": "Reflection", "note": "must include 3 reflection questions"},
+        {"type": "section_present", "value": "Checklist", "note": "checklist structure required"},
+        {"type": "stops_before_reframe", "note": "Phase 1 must NOT include Reframe — wait for user reflection answers"}
+      ]
+    },
+    {
+      "id": 2,
+      "label": "SMH long in daily uptrend — disciplined invalidation exit (Triad-complete submission, expected A-/B+)",
+      "prompt": "review my trade. SMH long, entry 571.32, SL 565.38 (just below PDC 566.50), PT 575 zone, R:R 2.02 pre-computed, manual exit at 570.81 on the violent red candle. Why SMH: catalyst is semi-sector tailwind today — SMH closed +1.72% (+9.77) on the daily, leading the broader tape; RS: SMH leading QQQ (+1.72% vs QQQ ~flat) AND held PDC during the intraday pullback while QQQ broke its PDC — clean relative-strength signal; pattern: P3 continuation rebound in daily uptrend on pullback to intraday EMA support. Sector ETF watched: SMH itself (it's the sector ETF, no narrower). Pre-written invalidation: exit if a lower high forms below 572 with bearish volume confirmation OR if QQQ/SPY break their PDC.",
+      "files": [
+        "evals/assets/smh_3col.png",
+        "evals/assets/session_4cell_igv.png"
+      ],
+      "ground_truth_summary": "P3 continuation long in clean daily uptrend with leading sector strength. Triad-complete submission: catalyst (sector tailwind), RS (leading QQQ + held PDC), pattern (P3 continuation). Triad Pass. R:R 2.02 pre-computed. Manual exit at 570.81 was thesis-invalidation (lower high at 574.30, 575 rejection, bearish volume spike) — NOT fear. Stop 565.38 never hit. This exit is a compliant invalidation cut (structural break, not fear). Expected grade A- to B+. Common misread: grading the exit as fear-based (mentor did this in iteration-1 live testing).",
+      "assertions": [
+        {"type": "contains_any", "values": ["A", "B+", "B"], "field": "grade", "note": "process grade should be A- or B+"},
+        {"type": "contains_any", "values": ["Pass", "PASS", "pass"], "field": "trade_quality_triad", "note": "Triad must Pass — all three legs satisfied per text inputs"},
+        {"type": "contains_any", "values": ["Pass", "PASS", "pass"], "field": "Q1", "note": "trend check must pass — daily uptrend"},
+        {"type": "contains_any", "values": ["Pass", "PASS", "pass"], "field": "relative_strength", "note": "SMH leading the tape must be recognized"},
+        {"type": "must_not_contain", "value": "fear exit", "field": "exit_grading", "note": "exit was invalidation-driven, not fear-driven"},
+        {"type": "contains_any", "values": ["invalidation", "thesis", "lower high", "rejection"], "field": "exit_grading", "note": "must recognize signal-based exit"},
+        {"type": "section_present", "value": "Reflection", "note": "3 reflection questions required"},
+        {"type": "stops_before_reframe", "note": "Phase 1 must NOT include Reframe"}
+      ]
+    },
+    {
+      "id": 3,
+      "label": "Missing 4-cell — must refuse full critique",
+      "prompt": "review my trade — CRM long, full stop-out.",
+      "files": [
+        "evals/assets/crm_3col.png"
+      ],
+      "ground_truth_summary": "Only 3-column ticker chart provided, no 4-cell indices chart. Per SKILL.md, mentor MUST refuse full critique and ask for the 4-cell, citing methodology requires market context (sentiment + relative strength). Reply should be short, one short message.",
+      "assertions": [
+        {"type": "short_response", "max_words": 100, "note": "must be one short message, not a full critique"},
+        {"type": "contains_any", "values": ["4-cell", "indices", "market context", "sentiment"], "note": "must name the missing input"},
+        {"type": "must_not_contain", "value": "Grade", "note": "no grading without full inputs"},
+        {"type": "must_not_contain", "value": "Reflection", "note": "no reflection questions without full inputs"}
+      ]
+    },
+    {
+      "id": 4,
+      "label": "Triad complete — IWM short with hot-PPI catalyst, strong RS, named pattern",
+      "prompt": "review my trade. IWM short, entry 282.43, PT 277.85, SL 283.43, trailed to above PrML 281. Why IWM: hot Core PPI MoM 1% vs 0.3% forecast (sector/macro headwind for rate-sensitive small caps), IWM the weakest of major index ETFs (low RS — short candidate), pattern is P2a breakdown after pre-market PrML break. Sector ETF watched: IWM is itself the small-cap broad ETF (no narrower sector). Pre-written invalidation: cut if QQQ reclaims PDC 707 and holds for 2 bars (sentiment-shift trigger). Trailed and exited on QQQ holding PDC + SPY HH/HL.",
+      "files": [
+        "evals/assets/smh_3col.png",
+        "evals/assets/session_4cell_igv.png"
+      ],
+      "ground_truth_summary": "All four pre-trade inputs provided in the prompt. Triad legs: catalyst (hot PPI macro headwind for IWM) — Pass. RS (IWM weakest of major ETFs) — Pass. Named pattern (P2a breakdown) — Pass. Pre-written trail rule provided. Sector ETF question is N/A for a broad ETF like IWM — accept the explanation. Mentor should proceed with critique, Triad row Passes, theme tag triad_complete present. Note: chart assets here are stand-ins; the test is exercising the input-gating + Triad-row plumbing, not chart accuracy.",
+      "assertions": [
+        {"type": "section_present", "value": "Trade Quality Triad", "note": "Triad row must appear in Checklist"},
+        {"type": "contains", "value": "Pass", "field": "trade_quality_triad", "note": "Triad must Pass with all three legs satisfied"},
+        {"type": "contains_any", "values": ["PPI", "rate-cut", "macro"], "note": "catalyst must be acknowledged"},
+        {"type": "section_present", "value": "Reflection", "note": "3 reflection questions still required"},
+        {"type": "stops_before_reframe", "note": "Phase 1 must NOT include Reframe"}
+      ]
+    },
+    {
+      "id": 5,
+      "label": "Missing pre-trade inputs — must block on text inputs the same way it blocks on missing 4-cell",
+      "prompt": "review my trade — SMH long, won.",
+      "files": [
+        "evals/assets/smh_3col.png",
+        "evals/assets/session_4cell_igv.png"
+      ],
+      "ground_truth_summary": "Both screenshots provided but no text inputs (no why-this-ticker / no setup levels / no sector ETF / no trail rule). Per updated SKILL.md, mentor MUST refuse full critique and list every missing field with the lesson ID anchoring each (L037 for Triad legs in why-this-ticker, L002 for sector ETF, L033 for trail rule). Reply should be short, one short message — same drill-sergeant gating as the missing 4-cell case.",
+      "assertions": [
+        {"type": "short_response", "max_words": 200, "note": "must be one short message, not a full critique"},
+        {"type": "contains_any", "values": ["why this ticker", "catalyst", "Triad", "L037"], "note": "must surface the why-this-ticker / Triad gap"},
+        {"type": "contains_any", "values": ["sector ETF", "L002"], "note": "must surface the missing sector ETF"},
+        {"type": "contains_any", "values": ["invalidation", "trail rule", "L033"], "note": "must surface the missing trail rule"},
+        {"type": "must_not_contain", "value": "Grade", "note": "no grading without full inputs"},
+        {"type": "must_not_contain", "value": "Reflection", "note": "no reflection questions without full inputs"}
+      ]
+    },
+    {
+      "id": 6,
+      "label": "No catalyst (pure-technical entry) — Triad fails, grade capped at B",
+      "prompt": "review my trade. SMH long, entry 571.32, PT 578, SL 565.38, trailed to BE at 571.32. Why SMH: pure technical bounce off 570 round-number support — no catalyst, just looked oversold on the 3m chart. RS: SMH is up 1.7% while QQQ is flat — strong RS. Pattern: P3 rebound off support. Sector ETF watched: SMH itself (it's the sector ETF). Pre-written invalidation: cut if 570 breaks and 3m closes below.",
+      "files": [
+        "evals/assets/smh_3col.png",
+        "evals/assets/session_4cell_igv.png"
+      ],
+      "ground_truth_summary": "All four pre-trade inputs provided. Triad legs: catalyst (none — explicitly 'no catalyst, just oversold') — FAIL. RS (SMH leading QQQ) — Pass. Named pattern (P3 rebound) — Pass. Triad fails on catalyst leg → grade capped at B regardless of clean execution downstream. Theme tag no_catalyst (and likely triad_partial) must appear. Critique still proceeds (no block — all inputs were provided), but the grade ceiling is B, not A.",
+      "assertions": [
+        {"type": "section_present", "value": "Trade Quality Triad", "note": "Triad row must appear in Checklist"},
+        {"type": "contains", "value": "Fail", "field": "trade_quality_triad", "note": "Triad must Fail on catalyst leg"},
+        {"type": "contains_any", "values": ["B", "B+", "B-", "C"], "field": "grade", "note": "grade must be B or worse — Triad-fail cap"},
+        {"type": "must_not_contain", "value": "A", "field": "grade", "note": "grade must NOT be A — Triad-fail cap is B"},
+        {"type": "contains_any", "values": ["L037", "Triad"], "note": "must reference L037 / Triad rule explicitly"},
+        {"type": "section_present", "value": "Reflection", "note": "3 reflection questions required"}
+      ]
+    }
+  ],
+  "iteration_history": [
+    {
+      "iteration": 1,
+      "date": "2026-05-12",
+      "context": "Initial test in interactive chat. CRM run + SMH run completed. Mentor initially misgraded SMH exit as fear-based; was corrected to invalidation exit after user cited lower high + volume + structural break.",
+      "findings": [
+        "Pre-market shading (peach zone) was ambiguous in SKILL.md — caused mentor to misread first-3-candle skip as 'no skip'.",
+        "Tag canon missing 'correct_RS_read' and 'disciplined_exit'.",
+        "Manual invalidation exit rule not explicitly captured in the exit-grading guidance — caused misgrade.",
+        "Sector ETF mapping (IGV for software, SMH itself for semis, XLF for financials) should be enumerated for the mentor's RS check."
+      ],
+      "deferred_skill_edits": "User asked to defer SKILL.md changes until eval set is in place — that's now."
+    },
+    {
+      "iteration": 2,
+      "date": "2026-05-16",
+      "context": "First formal skill-creator iteration loop. 6 evals × 2 conditions (with_skill / without_skill) × 1 run each = 12 subagent runs. Workspace: intraday-trade-mentor-workspace/iteration-2/. Pass rate with_skill 68.5% vs without_skill 36.7% (+31.8pp). Token cost 3.1x vs baseline.",
+      "findings": [
+        "HIGH: Evals 1 (CRM) and 2 (SMH) were written before the Trade Quality Triad gate (added 2026-05-15). Prompts had no Triad inputs, so the skill correctly blocked on missing-inputs instead of producing Phase 1. Assertions were obsolete. Action for iteration-3: prompts updated with realistic Triad inputs reconstructed from the trade journals.",
+        "MEDIUM: Block-reply verbosity — gating tests (evals 3 and 5) produced 390-450w replies against caps of 200/250w. Content correct, just over-explanatory. Action for iteration-3: SKILL.md Gating section now has a ≤150w hard length budget, bullet-per-field format, and explicit don't-re-teach guidance.",
+        "AUTHORING: Theme-tag assertions in evals 4 and 6 were testing for Phase 2 (journal) artifacts in Phase 1 output. Structurally unpassable. Action for iteration-3: those assertions removed.",
+        "VALIDATION: Skill value confirmed across structural assertions. Differentiating capabilities: Triad row + grade-cap, lesson-ID citations from LESSONS.md, Phase 1/Phase 2 boundary, input-gating.",
+        "OBSERVATION: Mentor caught the IGV-vs-SMH 4-cell sector-ETF mismatch unprompted in evals 5 and 6 — auditing screen setup beyond just trade execution. Eval asset library improvement deferred to the screenshot-persistence enhancement (future work)."
+      ],
+      "deferred_skill_edits": "None — iteration-3 applies the SKILL.md gating-brevity directive + eval set updates."
+    }
+  ]
+}
