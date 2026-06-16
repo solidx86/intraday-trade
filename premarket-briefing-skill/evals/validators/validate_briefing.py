@@ -36,6 +36,8 @@ REQUIRED_SECTIONS = [
 
 REQUIRED_INDICES = ["Nikkei", "Hang Seng", "KOSPI", "Shanghai", "DAX", "FTSE", "STOXX", "USD/JPY"]
 
+REGIME_TOKENS = ["SCARED", "GREEDY", "GOLDILOCKS", "NEUTRAL"]
+
 
 @dataclass
 class CheckResult:
@@ -108,6 +110,18 @@ def check_risk_verdict(sections: dict[str, str]) -> CheckResult:
         verdict = "RISK-ON" if "RISK-ON" in body else "RISK-OFF"
         return CheckResult("risk_verdict", True, f"verdict={verdict}")
     return CheckResult("risk_verdict", False, "no RISK-ON or RISK-OFF token in section 1.1")
+
+
+def check_regime_read(sections: dict[str, str]) -> CheckResult:
+    body = sections.get("## 1.1 General Market News", "")
+    found = [t for t in REGIME_TOKENS if t in body]
+    if found:
+        return CheckResult("regime_read", True, f"regime={found[0]}")
+    return CheckResult(
+        "regime_read",
+        False,
+        "no SCARED/GREEDY/GOLDILOCKS/NEUTRAL regime token in section 1.1",
+    )
 
 
 def check_econ_calendar(sections: dict[str, str]) -> CheckResult:
