@@ -84,6 +84,7 @@ For the structured-data sections, run the dedicated sources in `references/data-
 - **1.4 Portfolio News** — finviz `quote.ashx` per ticker (this fetch is also the Step 3.5 price-anchor pull), plus supplemental per-ticker WebSearch for tickers with news.
 - **Earnings** — investing.com earnings calendar.
 - **Global Market Spillover** — the Asia/Europe index searches and USD/JPY.
+- **Dollar & yields regime read** — fetch **DXY** and **US10Y** as evidenced *prior-close → now* pairs (direction vs the prior US cash-session close, 16:00 ET). Direction is what the read needs; an exact level is optional. See `references/macro-regime-read.md`. Feeds the 1.1 regime line and the Global Spillover tape.
 
 **Rules (both phases):**
 - **Always date-scope your searches.** Append the computed US trading date (e.g., `"stock market today May 15 2026"`) so you don't surface stale articles.
@@ -132,6 +133,8 @@ This step exists for the same reason as Step 1: when the model writes a specific
 
 Use the exact template in the **Output template** section below. Preserve section order and heading text. The user has read this format many times — consistency matters more than creativity.
 
+Classify the dollar/yields regime per `references/macro-regime-read.md` and write the regime + alignment lines into section 1.1.
+
 ### Step 5 — Save and render
 
 - Save to `data/trade-journal/daily/YYYY-MM-DD/premarket.md` (where YYYY-MM-DD is the **US trading date** from Step 1, not the Malaysia date). The path is relative to the intraday-trade repo root — the skill is symlinked into `~/.claude/skills/`, so resolve the symlink to find the real repo root, then write to `<repo-root>/data/trade-journal/daily/<US-date>/premarket.md`.
@@ -159,6 +162,8 @@ The 3 most important things happening in the market today:
 - **[Headline]** — [Why it matters]
 
 **Market mood:** **RISK-ON** / **RISK-OFF** — [one sentence why]
+**Dollar/Yields regime:** **SCARED** / **GREEDY** / **GOLDILOCKS** / **NEUTRAL** — [one-clause rationale] ([DXY arrow + prior-close → now] + [US10Y arrow + prior-close → now])
+→ [Alignment line. If mood and regime disagree, lead with **⚠️ MOOD/REGIME SPLIT** and fade/size-down guidance. If they agree, state the aligned posture — and in GREEDY/GOLDILOCKS fire the "don't short QQQ off a strong dollar" caveat. See references/macro-regime-read.md.]
 
 ---
 
@@ -251,6 +256,8 @@ In 3 bullets, for a trader with less than 1 year of experience:
 - **STOXX 600**: [level] [±%] — [driver]
 
 **USD/JPY:** [level] — [one sentence on yen carry-trade unwind risk if JPY strengthening sharply, else "stable, no carry-trade concern"]
+**DXY:** [level] — [direction vs prior US close, one sentence]
+**US10Y:** [level/%] — [direction vs prior US close, one sentence]
 
 **Notable overnight catalysts:** [Geopolitical events, central bank decisions, macro surprises from non-US markets. "None notable" is a fine answer.]
 
