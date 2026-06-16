@@ -26,6 +26,10 @@
           "type": "structural"
         },
         {
+          "text": "Section 1.1 includes a Dollar/Yields regime classification — one of SCARED / GREEDY / GOLDILOCKS / NEUTRAL — with an evidenced prior-close → now direction for DXY and US10Y, and flags a MOOD/REGIME SPLIT when the regime contradicts the RISK-ON/OFF verdict.",
+          "type": "qualitative"
+        },
+        {
           "text": "Section 1.2 either lists events with HIGH/MED/LOW impact labels, or states 'Light calendar today — no major data releases.'",
           "type": "structural"
         },
