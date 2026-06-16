@@ -6,8 +6,9 @@ Checks a generated premarket.md file against the skill's structural contract:
   2. Header has a YYYY-MM-DD date
   3. All 7 required section headings present in order
   4. Section 1.1 has a RISK-ON or RISK-OFF verdict
-  5. Section 1.2 has impact labels OR the "Light calendar today" fallback
-  6. Global Spillover lists all required Asia/Europe indices + USD/JPY
+  5. Section 1.1 has a dollar/yields regime token (SCARED/GREEDY/GOLDILOCKS/NEUTRAL)
+  6. Section 1.2 has impact labels OR the "Light calendar today" fallback
+  7. Global Spillover lists all required Asia/Europe indices + USD/JPY
 
 Exit code 0 if all pass, 1 otherwise.
 
@@ -35,6 +36,8 @@ REQUIRED_SECTIONS = [
 ]
 
 REQUIRED_INDICES = ["Nikkei", "Hang Seng", "KOSPI", "Shanghai", "DAX", "FTSE", "STOXX", "USD/JPY"]
+
+REGIME_TOKENS = ["SCARED", "GREEDY", "GOLDILOCKS", "NEUTRAL"]
 
 
 @dataclass
@@ -110,6 +113,31 @@ def check_risk_verdict(sections: dict[str, str]) -> CheckResult:
     return CheckResult("risk_verdict", False, "no RISK-ON or RISK-OFF token in section 1.1")
 
 
+def check_regime_read(sections: dict[str, str]) -> CheckResult:
+    body = sections.get("## 1.1 General Market News", "")
+    # Prefer the declared regime line so the detail reports the actual call,
+    # not a token that the alignment line merely names while teaching
+    # (e.g. "DXY only short-tells in the SCARED regime").
+    declared = re.search(
+        r"Dollar/Yields regime:\*\*\s*\**\s*(" + "|".join(REGIME_TOKENS) + r")\b",
+        body,
+    )
+    if declared:
+        return CheckResult("regime_read", True, f"regime={declared.group(1)}")
+    found = [t for t in REGIME_TOKENS if t in body]
+    if found:
+        return CheckResult(
+            "regime_read",
+            True,
+            f"regime token present ({found[0]}); no declared 'Dollar/Yields regime:' line",
+        )
+    return CheckResult(
+        "regime_read",
+        False,
+        "no SCARED/GREEDY/GOLDILOCKS/NEUTRAL regime token in section 1.1",
+    )
+
+
 def check_econ_calendar(sections: dict[str, str]) -> CheckResult:
     body = sections.get("## 1.2 Economic Announcements Today", "")
     if "Light calendar today" in body:
@@ -146,6 +174,7 @@ def run_all_checks(briefing_path: Path) -> list[CheckResult]:
         check_header_date(text),
         check_seven_sections(sections, text),
         check_risk_verdict(sections),
+        check_regime_read(sections),
         check_econ_calendar(sections),
         check_global_spillover(sections),
     ]

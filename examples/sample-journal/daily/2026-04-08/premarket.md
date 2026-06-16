@@ -16,6 +16,10 @@ The 3 most important things happening in the market today:
 
 **Market mood:** **MIXED, leaning RISK-OFF until CPI clears** — positioning is cautious; expect a fast, two-sided open.
 
+**Dollar/Yields regime:** **NEUTRAL** — DXY ↑ (prior close 104.05 → 104.20) + US10Y ↔ (4.34% → 4.35%). A tiny pre-CPI drift, both within noise; the cross-asset tape isn't confirming a regime.
+
+→ Ignore DXY as a QQQ tell today — trade the CPI reaction and levels, not the dollar.
+
 ---
 
 ## 1.2 Economic Announcements Today
@@ -72,6 +76,8 @@ Note: trade *after* the CPI reaction settles, not into the print.
 - **DAX**: −0.3%, **FTSE 100**: +0.1%, **STOXX 600**: −0.2% — waiting on CPI.
 
 **USD/JPY:** ~152.90 — slightly firmer; nothing disorderly.
+**DXY:** ~104.20 — marginally firmer into CPI; nothing disorderly.
+**US10Y:** ~4.35% — flat, coiled ahead of the 8:30 print.
 
 **Notable overnight catalysts:** none — the session is a coiled spring around the 8:30 print.
 
