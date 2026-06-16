@@ -55,3 +55,13 @@ def test_regime_read_scoped_to_section_1_1_only():
     }
     result = validate_briefing.check_regime_read(sections)
     assert not result.passed
+
+
+def test_run_all_checks_wires_in_regime_read():
+    from journal_schema import journal_trees, premarket_files
+
+    sample = next(
+        f for tree in journal_trees() for f in premarket_files(tree)
+    )
+    results = validate_briefing.run_all_checks(sample)
+    assert "regime_read" in {r.name for r in results}

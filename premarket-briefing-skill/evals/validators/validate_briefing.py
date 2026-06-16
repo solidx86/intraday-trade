@@ -6,8 +6,9 @@ Checks a generated premarket.md file against the skill's structural contract:
   2. Header has a YYYY-MM-DD date
   3. All 7 required section headings present in order
   4. Section 1.1 has a RISK-ON or RISK-OFF verdict
-  5. Section 1.2 has impact labels OR the "Light calendar today" fallback
-  6. Global Spillover lists all required Asia/Europe indices + USD/JPY
+  5. Section 1.1 has a dollar/yields regime token (SCARED/GREEDY/GOLDILOCKS/NEUTRAL)
+  6. Section 1.2 has impact labels OR the "Light calendar today" fallback
+  7. Global Spillover lists all required Asia/Europe indices + USD/JPY
 
 Exit code 0 if all pass, 1 otherwise.
 
@@ -160,6 +161,7 @@ def run_all_checks(briefing_path: Path) -> list[CheckResult]:
         check_header_date(text),
         check_seven_sections(sections, text),
         check_risk_verdict(sections),
+        check_regime_read(sections),
         check_econ_calendar(sections),
         check_global_spillover(sections),
     ]
