@@ -43,6 +43,7 @@ Co-location in `daily/<date>/` is intentional: context (`premarket.md`) and exec
 - **Session boundaries**: `git pull` at start, commit + push at end — in **both** repos (skills + private journal).
 - **Trade-date discipline**: `daily/<date>/` is the trade date from the chart (journals) or the MYT→ET US trading date (premarket) — never today's calendar date. Anchor the date explicitly before writing.
 - **Public-repo hygiene**: public files are **token-only** — no operative definitions, parameters, breakout tell-set, or course citations; all of that lives in the private framework supplement (`data/framework/framework-full.md`). Apply the **leak test**: text that lets a reader reconstruct a methodology rule (a parameter, a taxonomy, a pattern-entry rule, a course citation) belongs in the private supplement, not here; text that merely names an opaque token (P1/P2/P3) or narrates one trade is fine. Also: no real trades, no personal contact details.
+- **Spec & plan artifact formats**: brainstorming **specs** are authored as a **standalone, self-contained HTML file** (inline CSS, no external assets) for browser review — not Markdown. Implementation **plans** are authored in **both Markdown and HTML**: the `.md` is the execution source of truth (implementation is driven from it), the `.html` is the review companion. Specs live in `docs/superpowers/specs/`; plans in `docs/superpowers/plans/`. Keep the two plan formats in sync when either changes.
 
 ## Where to look next
 
