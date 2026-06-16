@@ -15,7 +15,9 @@ The 3 most important things happening in the market today:
 - **Quiet macro calendar.** No tier-1 prints today; tape likely driven by the earnings follow-through.
 
 **Market mood:** **RISK-ON** — earnings tailwind plus easing yields; semis leading, breadth supportive pre-open.
+
 **Dollar/Yields regime:** **GOLDILOCKS** — DXY ↓ (prior close 103.20 → 102.85) + US10Y ↓ (4.18% → 4.12%). Softer dollar with easing yields is a disinflation tailwind, not fear; risk-on is confirmed.
+
 → Inverse is OFF: the falling dollar isn't the driver today — trade the semi leadership on its own merits.
 
 ---

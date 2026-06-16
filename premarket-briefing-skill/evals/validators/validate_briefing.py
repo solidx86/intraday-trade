@@ -115,9 +115,22 @@ def check_risk_verdict(sections: dict[str, str]) -> CheckResult:
 
 def check_regime_read(sections: dict[str, str]) -> CheckResult:
     body = sections.get("## 1.1 General Market News", "")
+    # Prefer the declared regime line so the detail reports the actual call,
+    # not a token that the alignment line merely names while teaching
+    # (e.g. "DXY only short-tells in the SCARED regime").
+    declared = re.search(
+        r"Dollar/Yields regime:\*\*\s*\**\s*(" + "|".join(REGIME_TOKENS) + r")\b",
+        body,
+    )
+    if declared:
+        return CheckResult("regime_read", True, f"regime={declared.group(1)}")
     found = [t for t in REGIME_TOKENS if t in body]
     if found:
-        return CheckResult("regime_read", True, f"regime={found[0]}")
+        return CheckResult(
+            "regime_read",
+            True,
+            f"regime token present ({found[0]}); no declared 'Dollar/Yields regime:' line",
+        )
     return CheckResult(
         "regime_read",
         False,

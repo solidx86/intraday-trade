@@ -15,7 +15,9 @@ The 3 most important things happening in the market today:
 - **Tech digesting Monday's run.** Semi leaders flat-to-down premarket after two strong sessions.
 
 **Market mood:** **MIXED, leaning RISK-OFF until CPI clears** — positioning is cautious; expect a fast, two-sided open.
+
 **Dollar/Yields regime:** **NEUTRAL** — DXY ↑ (prior close 104.05 → 104.20) + US10Y ↔ (4.34% → 4.35%). A tiny pre-CPI drift, both within noise; the cross-asset tape isn't confirming a regime.
+
 → Ignore DXY as a QQQ tell today — trade the CPI reaction and levels, not the dollar.
 
 ---

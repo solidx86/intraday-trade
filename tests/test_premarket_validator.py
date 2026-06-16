@@ -57,6 +57,23 @@ def test_regime_read_scoped_to_section_1_1_only():
     assert not result.passed
 
 
+def test_regime_read_detail_reports_declared_token_not_caveat():
+    # The 1.1 body declares GREEDY, but the alignment line legitimately names
+    # SCARED while teaching. The detail must report the DECLARED regime, not
+    # the first token that happens to appear.
+    sections = {
+        SECTION_1_1: (
+            "**Market mood:** **RISK-ON** — holding gains.\n\n"
+            "**Dollar/Yields regime:** **GREEDY** — DXY up + US10Y up.\n\n"
+            "→ DXY only short-tells QQQ in the **SCARED** regime, which is not today.\n"
+        )
+    }
+    result = validate_briefing.check_regime_read(sections)
+    assert result.passed
+    assert "GREEDY" in result.detail
+    assert "SCARED" not in result.detail
+
+
 def test_run_all_checks_wires_in_regime_read():
     from journal_schema import journal_trees, premarket_files
 

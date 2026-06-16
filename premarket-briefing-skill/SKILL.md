@@ -162,8 +162,12 @@ The 3 most important things happening in the market today:
 - **[Headline]** — [Why it matters]
 
 **Market mood:** **RISK-ON** / **RISK-OFF** — [one sentence why]
+
 **Dollar/Yields regime:** **SCARED** / **GREEDY** / **GOLDILOCKS** / **NEUTRAL** — [one-clause rationale] ([DXY arrow + prior-close → now] + [US10Y arrow + prior-close → now])
+
 → [Alignment line. If mood and regime disagree, lead with **⚠️ MOOD/REGIME SPLIT** and fade/size-down guidance. If they agree, state the aligned posture — and in GREEDY/GOLDILOCKS fire the "don't short QQQ off a strong dollar" caveat. See references/macro-regime-read.md.]
+
+(Keep these three lines blank-line separated — without the blank lines markdown collapses them into one clumped paragraph.)
 
 ---
 
