@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design — Dollar/Yields Regime Read for the Pre-Market Briefing</title>
+<style>
+  :root {
+    --ink: #1a1f29; --muted: #5c6675; --line: #e2e6ec; --bg: #fbfcfd;
+    --accent: #1f6feb; --warn-bg: #fff4e5; --warn-bd: #f0c27a;
+    --good-bg: #eaf6ec; --good-bd: #a9d8b3; --code-bg: #f4f6f8;
+    --scared: #c0392b; --greedy: #1f6feb; --goldi: #1e8a4c; --neutral: #6b7280;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font: 16px/1.62 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink); background: var(--bg); margin: 0; padding: 0;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 48px 28px 96px; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 { font-size: 21px; margin: 44px 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--line); letter-spacing: -0.01em; }
+  h3 { font-size: 17px; margin: 28px 0 8px; }
+  p, li { color: var(--ink); }
+  .meta { color: var(--muted); font-size: 14px; margin: 0 0 8px; }
+  .status { display: inline-block; background: var(--good-bg); border: 1px solid var(--good-bd);
+    color: #1e6b38; font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+  code { background: var(--code-bg); padding: 1.5px 5px; border-radius: 4px; font-size: 13.5px;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px 16px; overflow-x: auto; font-size: 13px; line-height: 1.5;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14.5px; }
+  th, td { border: 1px solid var(--line); padding: 8px 11px; text-align: left; vertical-align: top; }
+  th { background: #f0f3f7; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .callout { border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 14.5px; }
+  .warn { background: var(--warn-bg); border: 1px solid var(--warn-bd); }
+  .good { background: var(--good-bg); border: 1px solid var(--good-bd); }
+  .tok { font-weight: 700; }
+  .tok.s { color: var(--scared); } .tok.g { color: var(--greedy); }
+  .tok.gl { color: var(--goldi); } .tok.n { color: var(--neutral); }
+  ul, ol { padding-left: 22px; }
+  li { margin: 4px 0; }
+  .files li { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 13.5px; }
+  .lede { font-size: 17px; color: var(--muted); margin: 0 0 8px; }
+  hr { border: none; border-top: 1px solid var(--line); margin: 40px 0; }
+  .tag { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Dollar/Yields Regime Read for the Pre-Market Briefing</h1>
+  <p class="meta"><strong>Date:</strong> 2026-06-16 &nbsp;·&nbsp; <strong>Skill:</strong> <code>premarket-briefing-skill</code> &nbsp;·&nbsp; <strong>Branch:</strong> <code>feat/premarket-regime-read</code></p>
+  <p><span class="status">Approved design — ready for implementation plan</span></p>
+
+  <h2>Problem</h2>
+  <p>The briefing's <strong>1.1 General Market News</strong> section ends with a single
+  <code>Market mood: RISK-ON / RISK-OFF</code> verdict. That verdict is a <em>soft, single-asset-class
+  read</em> — derived narratively from the day's headlines and equity-futures direction, with no
+  cross-asset confirmation. The validator only checks that the RISK-ON/OFF token exists, not how it
+  was derived.</p>
+  <p>That makes it the easiest signal in the briefing to fake. A green-futures headline can stamp
+  "RISK-ON" while the bond and FX markets are still pricing fear — the classic relief-bounce that
+  looks great at 9:30 and is dead by 11:00. The briefing currently has no structural way to catch
+  that disagreement.</p>
+  <p>Separately, the trader has observed the <code>DXY ↔ QQQ</code> inverse correlation break down
+  (e.g. overnight sessions where both rose together) and needs a rule for <em>when</em> "strong
+  dollar → short QQQ" is actually tradeable.</p>
+
+  <h2>Goals</h2>
+  <ul>
+    <li>Add a <strong>cross-asset regime read</strong> (dollar + 10-year yield) to section 1.1 that
+      classifies <em>why</em> money is moving, grounded in two fetched data points rather than narrative.</li>
+    <li>Give the trader an explicit, actionable rule for when the <code>DXY → QQQ</code> inverse is on vs off.</li>
+    <li>Make the regime read a <strong>lie-detector on the mood verdict</strong>: when the two
+      disagree, flag the divergence — it is one of the most actionable lines in the briefing.</li>
+    <li>Enforce the regime read durably (validator) <em>and</em> prove the enforcement actually bites (tests).</li>
+  </ul>
+
+  <h2>Background — the trading logic (one screen)</h2>
+  <p>The <code>DXY ↔ QQQ</code> inverse is <strong>regime-dependent</strong>, not a law. It only holds
+  when one risk driver is moving both markets. <strong>The 10-year Treasury yield (US10Y) is the
+  tiebreaker</strong> that tells you which regime you're in:</p>
+
+  <table>
+    <thead><tr><th>Dollar (DXY)</th><th>Yields (US10Y)</th><th>Regime</th><th>What it means</th><th><code>DXY→QQQ</code> inverse</th></tr></thead>
+    <tbody>
+      <tr><td>↑</td><td>↓</td><td><span class="tok s">SCARED</span></td><td>Money hiding in cash <em>and</em> bonds — genuine fear</td><td><strong>ON</strong> — short-tell works</td></tr>
+      <tr><td>↑</td><td>↑</td><td><span class="tok g">GREEDY</span></td><td>Money chasing US growth / rates — not hiding</td><td><strong>OFF</strong></td></tr>
+      <tr><td>↓</td><td>↓</td><td><span class="tok gl">GOLDILOCKS</span></td><td>Inflation fear leaving; cheap-money tailwind for tech</td><td><strong>OFF</strong></td></tr>
+      <tr><td>flat / mixed</td><td>flat / mixed</td><td><span class="tok n">NEUTRAL</span></td><td>Move within noise of prior close, or signals conflict weakly</td><td><strong>OFF</strong> — ignore DXY as a tell</td></tr>
+    </tbody>
+  </table>
+
+  <p><strong>Direction = the overnight/pre-market net move</strong>, measured as <em>current level vs
+  prior US cash-session close (16:00 ET)</em> — the same "prior close" / "Friday close" line already
+  drawn on the trader's TradingView charts. It is a snapshot at briefing time, not a forecast of the
+  post-open trend.</p>
+
+  <h2>Design</h2>
+
+  <h3>1. New reference file — <code>references/macro-regime-read.md</code></h3>
+  <p>A self-contained cheat sheet the skill loads at write time (same pattern as
+  <code>data-sources.md</code>). Contents:</p>
+  <ul>
+    <li>The four-regime table above (dollar × yields → SCARED / GREEDY / GOLDILOCKS / NEUTRAL).</li>
+    <li>The <code>DXY → QQQ</code> caveat: the inverse is only tradeable in <span class="tok s">SCARED</span>.</li>
+    <li>The <strong>divergence / alignment matrix</strong> (below) — how the regime confirms or contradicts the mood verdict.</li>
+    <li>The <strong>evidenced direction discipline</strong>: an arrow may only be written from a fetched
+      <em>prior-close → now</em> pair, never inferred from "the catalyst says the dollar should be up."</li>
+    <li>NEUTRAL definition: move within noise of prior close, or DXY/yields conflicting weakly.</li>
+  </ul>
+  <div class="callout warn"><span class="tag">Leak test</span><br>
+    This is textbook macro — no P1/P2/P3 patterns, no parameters, no course citations — so it lives in
+    the <strong>public</strong> skill, not the private framework supplement.</div>
+
+  <h3>2. The divergence / alignment matrix</h3>
+  <p>The two labels answer different questions (<em>mood</em> vs <em>cross-asset money flow</em>), so
+  they can disagree. The disagreement is the signal:</p>
+  <table>
+    <thead><tr><th>Verdict</th><th>Regime</th><th>What it really is</th><th>Intraday posture</th></tr></thead>
+    <tbody>
+      <tr><td>RISK-ON</td><td><span class="tok gl">GOLDILOCKS</span></td><td>Real deal — stocks ↑, dollar ↓, yields ↓</td><td>Highest conviction; press strength</td></tr>
+      <tr><td>RISK-ON</td><td><span class="tok g">GREEDY</span></td><td>Genuine, dollar ↑ on growth/rates</td><td>Trade longs — but inverse OFF, don't short QQQ off the strong dollar</td></tr>
+      <tr><td>RISK-OFF</td><td><span class="tok s">SCARED</span></td><td>Genuine fear — dollar ↑, yields ↓</td><td>Respect it; <code>DXY↑→short QQQ</code> works</td></tr>
+      <tr style="background:var(--warn-bg)"><td><strong>RISK-ON</strong></td><td><span class="tok s">SCARED</span></td><td>⚠️ <strong>Unconfirmed rally</strong> — stocks bid, money still in the bunker</td><td>Fade-prone; size down, demand confirmation before chasing</td></tr>
+      <tr style="background:var(--warn-bg)"><td><strong>RISK-OFF</strong></td><td><span class="tok g">GREEDY</span></td><td><strong>Rates-driven dip, not fear</strong> — dollar ↑ + yields ↑</td><td>Don't panic-short the open; pullbacks into support tend to get bought</td></tr>
+      <tr><td>either</td><td><span class="tok n">NEUTRAL</span></td><td>Cross-asset tape isn't confirming anything</td><td>Trade the equity/level read alone; ignore DXY</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3. <code>SKILL.md</code> changes</h3>
+  <ul>
+    <li><strong>Step 3b (targeted lookups)</strong> — add a fetch of <strong>DXY</strong> and
+      <strong>US10Y</strong> as <em>evidenced prior-close → now pairs</em> (sibling to the existing
+      USD/JPY fetch). Direction is what the rule needs; an exact level is optional.</li>
+    <li><strong>Step 4 / Output template, section 1.1</strong> — add two lines under the existing
+      <code>Market mood</code> verdict: a <code>Dollar/Yields regime:</code> line (token + one-clause
+      rationale + the evidenced pair) and a <code>→</code> alignment line that flags a mood/regime split
+      when present, or states the aligned posture (firing the QQQ-inverse caveat in GREEDY/GOLDILOCKS).</li>
+    <li><strong>Global Market Spillover</strong> — add <strong>DXY</strong> and <strong>US10Y</strong> as
+      two tape lines beside the existing <code>USD/JPY</code>, so verified numbers sit with the other macro tape.</li>
+    <li>Link <code>references/macro-regime-read.md</code> from the relevant step (as <code>data-sources.md</code> is linked).</li>
+  </ul>
+  <p class="tag">Example 1.1 output</p>
+  <pre>**Market mood:** **RISK-ON** — Iran de-escalation holds; equity futures bid.
+**Dollar/Yields regime:** GREEDY — DXY ↑ (Fri close 99.60 → 99.79) + US10Y ↑ (4.44% → 4.48%).
+  Both rising together = money chasing US growth, not hiding — a strong dollar here is NOT risk-off.
+→ Inverse is OFF today: don't short QQQ just because the dollar's green. DXY only works as a
+  QQQ short-tell in the SCARED regime (DXY ↑ + yields ↓).</pre>
+  <p class="tag">Example — mood/regime split</p>
+  <pre>→ ⚠️ MOOD/REGIME SPLIT: headlines read RISK-ON but cross-asset is SCARED (dollar ↑ + yields ↓).
+  Bond/FX market isn't confirming the bounce — treat early strength as fade-prone, size down.</pre>
+
+  <h3>4. Validator — check #7 <code>check_regime_read</code></h3>
+  <ul>
+    <li>New check in <code>evals/validators/validate_briefing.py</code>, scoped to the
+      <code>## 1.1 General Market News</code> body only (mirrors <code>check_risk_verdict</code>).</li>
+    <li>Passes if the body contains one of <span class="tok s">SCARED</span> /
+      <span class="tok g">GREEDY</span> / <span class="tok gl">GOLDILOCKS</span> /
+      <span class="tok n">NEUTRAL</span>.</li>
+    <li>Wired into <code>run_all_checks</code>; module docstring + printed check-count updated (6 → 7).</li>
+    <li><strong>Validated-lite by design:</strong> no regex for arrows or numbers — that would be brittle
+      against legitimate phrasing and cause false CI failures. The evidenced-pair discipline lives in
+      SKILL.md prose, not the validator.</li>
+  </ul>
+
+  <h3>5. Tests (TDD)</h3>
+  <p>The existing <code>test_premarket.py</code> is data-driven only — it proves the corpus
+  <em>passes</em>, never that a check <em>bites</em>. New file <code>tests/test_premarket_validator.py</code>
+  closes that gap, written test-first:</p>
+  <ul>
+    <li><code>check_regime_read</code> passes for each of the four tokens (parametrized).</li>
+    <li><code>check_regime_read</code> <strong>fails</strong> when no token is present (proves it bites).</li>
+    <li><code>check_regime_read</code> is scoped to 1.1 — a token in another section does not satisfy it.</li>
+    <li><code>run_all_checks</code> emits a result named <code>regime_read</code> (proves it's wired).</li>
+  </ul>
+  <p>The existing <code>test_briefing_passes_structural_validator</code> automatically extends the new
+  check across the whole tracked corpus once the sample data is updated.</p>
+
+  <h3>6. Sample data updates</h3>
+  <p>Both tracked briefings get the regime line added to 1.1 and the DXY/US10Y tape lines to Global
+  Spillover, consistent with each day's existing synthetic narrative:</p>
+  <ul class="files">
+    <li>examples/sample-journal/daily/2026-04-06/premarket.md &nbsp;<span class="tag">RISK-ON day → GOLDILOCKS (easing yields, soft data)</span></li>
+    <li>examples/sample-journal/daily/2026-04-08/premarket.md &nbsp;<span class="tag">CPI-wait day → NEUTRAL (coiled, two-sided)</span></li>
+  </ul>
+  <p>Per repo policy: fix the data to the schema, no escape hatches.</p>
+
+  <h3>7. Eval rubric line</h3>
+  <p>Add one rubric criterion to <code>premarket-briefing-skill/evals/evals.json</code> rewarding a
+  correctly-classified, evidenced regime read in 1.1 (and the divergence flag when mood and regime
+  split). This is the external <code>skill-creator</code> runner, separate from pytest.</p>
+
+  <hr>
+
+  <h2>Decisions locked (ratified in design discussion)</h2>
+  <table>
+    <thead><tr><th>Decision</th><th>Choice</th></tr></thead>
+    <tbody>
+      <tr><td>Where the read lives</td><td>Enrich existing 1.1 <code>Market mood</code> — not a new section</td></tr>
+      <tr><td>Core tiebreaker</td><td>US10Y yield (gold/VIX/oil stay optional confirmers, not fetched routinely)</td></tr>
+      <tr><td>Token set</td><td>SCARED / GREEDY / GOLDILOCKS / <strong>NEUTRAL</strong> (NEUTRAL added so quiet days aren't forced into false precision)</td></tr>
+      <tr><td>Direction definition</td><td>current vs prior US-cash close (16:00 ET); evidenced prior-close → now pair</td></tr>
+      <tr><td>Numbers discipline</td><td>Direction-only output; arrows must be evidenced, not inferred</td></tr>
+      <tr><td>Durability</td><td>Validated-lite — token enforced in 1.1, no arrow/number regex</td></tr>
+      <tr><td>Divergence flag</td><td>Annotate, don't override — both lines visible; <code>→</code> line flags splits</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Files touched</h2>
+  <ul class="files">
+    <li>premarket-briefing-skill/references/macro-regime-read.md &nbsp;<span class="tag">new</span></li>
+    <li>premarket-briefing-skill/SKILL.md &nbsp;<span class="tag">Step 3b + 1.1 template + Spillover + ref link</span></li>
+    <li>premarket-briefing-skill/evals/validators/validate_briefing.py &nbsp;<span class="tag">check #7</span></li>
+    <li>premarket-briefing-skill/evals/evals.json &nbsp;<span class="tag">rubric line</span></li>
+    <li>tests/test_premarket_validator.py &nbsp;<span class="tag">new — negative/unit tests</span></li>
+    <li>examples/sample-journal/daily/2026-04-06/premarket.md &nbsp;<span class="tag">data</span></li>
+    <li>examples/sample-journal/daily/2026-04-08/premarket.md &nbsp;<span class="tag">data</span></li>
+  </ul>
+
+  <h2>Out of scope</h2>
+  <ul>
+    <li>Section order, numbering, and the other six sections — unchanged.</li>
+    <li>The Step 3.5 price-anchor table — untouched (DXY/US10Y aren't finviz <code>quote.ashx</code> names; they sit outside it).</li>
+    <li>The other two skills and the trade journal schema — untouched.</li>
+    <li>Mandatory gold/VIX/oil fetches — explicitly not added.</li>
+  </ul>
+
+  <h2>Verification</h2>
+  <ul>
+    <li><code>pytest -q</code> green — including the new negative tests (the strip-the-token case must fail before the check is implemented, then pass after).</li>
+    <li>Validator reports 7/7 on both sample briefings.</li>
+    <li>Re-read SKILL.md + reference file for internal consistency (token set, evidenced-pair rule, divergence flag).</li>
+    <li>Leak test re-applied to the new reference file.</li>
+  </ul>
+
+</div>
+</body>
+</html>

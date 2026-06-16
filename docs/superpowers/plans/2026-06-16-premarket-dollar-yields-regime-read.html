@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan — Dollar/Yields Regime Read for the Pre-Market Briefing</title>
+<style>
+  :root { --ink:#1a1f29; --muted:#5c6675; --line:#e2e6ec; --bg:#fbfcfd; --accent:#1f6feb;
+    --code-bg:#f4f6f8; --good-bd:#a9d8b3; --good-bg:#eaf6ec; --warn-bg:#fff4e5; --warn-bd:#f0c27a; }
+  * { box-sizing:border-box; }
+  body { font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink); background:var(--bg); margin:0; }
+  .wrap { max-width:880px; margin:0 auto; padding:48px 28px 96px; }
+  h1 { font-size:29px; margin:0 0 6px; letter-spacing:-0.01em; }
+  h2 { font-size:20px; margin:40px 0 10px; padding:8px 12px; background:#eef2f7;
+    border-left:4px solid var(--accent); border-radius:4px; }
+  h3 { font-size:16px; margin:22px 0 6px; color:#33405a; }
+  .meta { color:var(--muted); font-size:14px; margin:2px 0; }
+  .status { display:inline-block; background:var(--good-bg); border:1px solid var(--good-bd);
+    color:#1e6b38; font-size:13px; font-weight:600; padding:3px 10px; border-radius:999px; margin-top:6px; }
+  code { background:var(--code-bg); padding:1.5px 5px; border-radius:4px; font-size:13px;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace; }
+  pre { background:var(--code-bg); border:1px solid var(--line); border-radius:8px; padding:13px 15px;
+    overflow-x:auto; font-size:12.5px; line-height:1.5; font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace; }
+  .step { margin:8px 0; padding-left:26px; position:relative; }
+  .step::before { content:"☐"; position:absolute; left:4px; color:var(--accent); font-size:15px; }
+  .step b { color:var(--ink); }
+  ul.files { font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace; font-size:13px; }
+  .run { background:var(--warn-bg); border:1px solid var(--warn-bd); border-radius:6px;
+    padding:8px 12px; font-size:13.5px; margin:6px 0; }
+  .run code { background:transparent; padding:0; }
+  hr { border:none; border-top:1px solid var(--line); margin:36px 0; }
+  .tag { font-size:12px; color:var(--muted); }
+  .note { background:#eef2f7; border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:14px 0; font-size:14.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Dollar/Yields Regime Read — Implementation Plan</h1>
+  <p class="meta"><strong>Goal:</strong> Add a cross-asset dollar/yields regime read (SCARED / GREEDY / GOLDILOCKS / NEUTRAL) to section 1.1 of the pre-market briefing, enforced by the validator and proven by tests.</p>
+  <p class="meta"><strong>Branch:</strong> <code>feat/premarket-regime-read</code> &nbsp;·&nbsp; <strong>Spec:</strong> <code>2026-06-16-premarket-dollar-yields-regime-read-design.html</code></p>
+  <p class="meta"><strong>Execution source of truth:</strong> the <code>.md</code> plan. This HTML is the review companion.</p>
+  <p><span class="status">Awaiting your review — no code executed yet</span></p>
+
+  <div class="note"><strong>Commit-green discipline:</strong> the validator check is implemented (Task 2) <em>before</em> it is wired into <code>run_all_checks</code> (Task 3), so the data-driven <code>test_premarket.py</code> never goes red between commits. Sample data is updated in the same commit that wires the check in.</div>
+
+  <h2>File structure</h2>
+  <ul class="files">
+    <li><span class="tag">create</span> premarket-briefing-skill/references/macro-regime-read.md</li>
+    <li><span class="tag">modify</span> premarket-briefing-skill/evals/validators/validate_briefing.py</li>
+    <li><span class="tag">create</span> tests/test_premarket_validator.py</li>
+    <li><span class="tag">modify</span> premarket-briefing-skill/SKILL.md</li>
+    <li><span class="tag">modify</span> premarket-briefing-skill/evals/evals.json</li>
+    <li><span class="tag">modify</span> examples/sample-journal/daily/2026-04-06/premarket.md</li>
+    <li><span class="tag">modify</span> examples/sample-journal/daily/2026-04-08/premarket.md</li>
+  </ul>
+
+  <hr>
+
+  <h2>Task 1 · Reference file <code>macro-regime-read.md</code></h2>
+  <p class="tag">Documentation file (no test) — the single source of the regime logic SKILL.md points at.</p>
+  <div class="step"><b>Step 1:</b> Write the reference file (4-regime table, DXY→QQQ caveat, divergence matrix, evidenced-direction rule). Full content in the <code>.md</code> plan.</div>
+  <div class="step"><b>Step 2:</b> Leak-test it — textbook macro only, stays public.</div>
+  <div class="step"><b>Step 3:</b> Commit <code>docs: add macro-regime-read reference for premarket briefing</code></div>
+
+  <h2>Task 2 · Validator check <code>check_regime_read</code> (not yet wired)</h2>
+  <p class="tag">TDD: tests first → watch fail → implement. Not wired into run_all_checks yet (keeps test_premarket.py green).</p>
+  <div class="step"><b>Step 1:</b> Write <code>tests/test_premarket_validator.py</code> — parametrized pass for all 4 tokens, fail when token absent, fail when token only in another section.</div>
+  <div class="step"><b>Step 2:</b> Run — expect FAIL (<code>AttributeError: ... check_regime_read</code>).
+    <div class="run"><code>python -m pytest tests/test_premarket_validator.py -v</code></div></div>
+  <div class="step"><b>Step 3:</b> Implement the check + <code>REGIME_TOKENS</code> constant:
+<pre>REGIME_TOKENS = ["SCARED", "GREEDY", "GOLDILOCKS", "NEUTRAL"]
+
+def check_regime_read(sections: dict[str, str]) -> CheckResult:
+    body = sections.get("## 1.1 General Market News", "")
+    found = [t for t in REGIME_TOKENS if t in body]
+    if found:
+        return CheckResult("regime_read", True, f"regime={found[0]}")
+    return CheckResult(
+        "regime_read",
+        False,
+        "no SCARED/GREEDY/GOLDILOCKS/NEUTRAL regime token in section 1.1",
+    )</pre></div>
+  <div class="step"><b>Step 4:</b> Run — expect PASS.</div>
+  <div class="step"><b>Step 5:</b> <code>python -m pytest -q</code> — full suite still green (run_all_checks untouched).</div>
+  <div class="step"><b>Step 6:</b> Commit <code>feat: add check_regime_read validator check with unit tests</code></div>
+
+  <h2>Task 3 · Wire the check in + conform sample data (one green commit)</h2>
+  <div class="step"><b>Step 1:</b> Append the <code>test_run_all_checks_wires_in_regime_read</code> test.</div>
+  <div class="step"><b>Step 2:</b> Run that test — expect FAIL (<code>regime_read</code> not in result names).</div>
+  <div class="step"><b>Step 3:</b> Add <code>check_regime_read(sections)</code> to the <code>run_all_checks</code> return list, right after <code>check_risk_verdict</code>; update the module docstring numbering.</div>
+  <div class="step"><b>Step 4:</b> 2026-04-06 briefing → <strong>GOLDILOCKS</strong> (DXY ↓ 103.20→102.85, US10Y ↓ 4.18→4.12) + regime/alignment lines + DXY/US10Y spillover tape.</div>
+  <div class="step"><b>Step 5:</b> 2026-04-08 briefing → <strong>NEUTRAL</strong> (DXY ↑ 104.05→104.20, US10Y ↔ 4.34→4.35) + regime/alignment lines + DXY/US10Y spillover tape.</div>
+  <div class="step"><b>Step 6:</b> <code>python -m pytest -q</code> — all green (7/7 per briefing).</div>
+  <div class="step"><b>Step 7:</b> Commit <code>feat: enforce regime read in validator and conform sample briefings</code></div>
+
+  <h2>Task 4 · SKILL.md — fetch, template, spillover, link</h2>
+  <div class="step"><b>Step 1:</b> Step 3b — add the DXY + US10Y evidenced prior-close→now fetch bullet (references macro-regime-read.md).</div>
+  <div class="step"><b>Step 2:</b> 1.1 template — add the <code>Dollar/Yields regime:</code> line + <code>→</code> alignment line under <code>Market mood</code>.</div>
+  <div class="step"><b>Step 3:</b> Global Spillover template — add <code>DXY</code> and <code>US10Y</code> tape lines beside <code>USD/JPY</code>.</div>
+  <div class="step"><b>Step 4:</b> Step 4 — point at <code>references/macro-regime-read.md</code> for classification.</div>
+  <div class="step"><b>Step 5:</b> Re-read for token + evidenced-pair + alignment consistency.</div>
+  <div class="step"><b>Step 6:</b> Commit <code>feat: wire dollar/yields regime read into briefing SKILL.md template</code></div>
+
+  <h2>Task 5 · Eval rubric line</h2>
+  <div class="step"><b>Step 1:</b> Add a qualitative assertion to eval id 1 (after the RISK-ON/OFF assertion):
+<pre>{
+  "text": "Section 1.1 includes a Dollar/Yields regime classification — one of
+   SCARED / GREEDY / GOLDILOCKS / NEUTRAL — with an evidenced prior-close → now
+   direction for DXY and US10Y, and flags a MOOD/REGIME SPLIT when the regime
+   contradicts the RISK-ON/OFF verdict.",
+  "type": "qualitative"
+}</pre></div>
+  <div class="step"><b>Step 2:</b> Validate JSON parses.</div>
+  <div class="step"><b>Step 3:</b> Commit <code>test: add regime-read assertion to premarket eval rubric</code></div>
+
+  <h2>Task 6 · Final verification</h2>
+  <div class="step"><b>Step 1:</b> <code>python -m pytest -q</code> — all green.</div>
+  <div class="step"><b>Step 2:</b> Run the validator directly on both samples — expect <code>7/7 checks passed. Overall: PASS</code>.</div>
+  <div class="step"><b>Step 3:</b> Final leak-test + token-consistency read.</div>
+
+  <hr>
+  <p class="tag">Self-review complete: spec coverage mapped, no placeholders, <code>check_regime_read</code> / <code>REGIME_TOKENS</code> / <code>"regime_read"</code> names consistent across tasks, commit-green ordering verified.</p>
+
+</div>
+</body>
+</html>

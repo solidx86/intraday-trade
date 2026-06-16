@@ -15,5 +15,8 @@ __pycache__/
 # Pre-publish IP-abstraction review artifacts (design/plan HTML) — never publish
 review-artifacts/
 
-# Internal working docs (design specs + implementation plans) — kept local, not published
-/docs/superpowers/
+# Superseded internal design docs — kept local, not published
+/docs/superpowers/specs/2026-05-22-premarket-source-driven-harvest-design.md
+/docs/superpowers/plans/2026-05-22-premarket-source-driven-harvest.md
+/docs/superpowers/specs/2026-06-15-public-readiness-cleanup-design.md
+/docs/superpowers/plans/2026-06-15-public-readiness-cleanup.md
