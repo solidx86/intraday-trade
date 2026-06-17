@@ -115,7 +115,7 @@ For the structured-data sections, run the dedicated sources in `references/data-
 - **1.3 sector gap-check** — finviz `groups.ashx` heatmap, to catch a big sector mover the harvest didn't headline.
 - **1.4 Portfolio News** — finviz `quote.ashx` per ticker (this fetch is also the Step 3.5 price-anchor pull), plus supplemental per-ticker WebSearch for tickers with news.
 - **Earnings** — investing.com earnings calendar.
-- **Global Market Spillover** — the Asia/Europe index searches and USD/JPY.
+- **Global Market Spillover** — Asia/Europe indices and USD/JPY from the Step 3a tape, topped up from CNBC `asia-markets/` + `europe-markets/` (browser) for indices the tape misses (KOSPI especially) and the per-region themes. Then compose the **→ US Spillover Read** block per `references/global-spillover-read.md` — sector-level transmission channels, gated to material moves, collapsing to one benign line on a quiet tape.
 - **Dollar & yields regime read** — **US10Y** (and **DXY** when present) come from the Step 3a Tape Table; only fetch them here if the tape pull missed them. Read both as evidenced *prior-close → now* pairs (direction vs the prior US cash-session close, 16:00 ET). Direction is what the read needs; an exact level is optional. See `references/macro-regime-read.md`. Feeds the 1.1 regime line and the Global Spillover tape.
 
 **Rules (both phases):**
@@ -303,6 +303,12 @@ In 3 bullets, for a trader with less than 1 year of experience:
 **US10Y:** [level/%] — [direction vs prior US close, one sentence]
 
 **Notable overnight catalysts:** [Geopolitical events, central bank decisions, macro surprises from non-US markets. "None notable" is a fine answer.]
+
+**→ US Spillover Read (what it means at the open):**
+- [Channel]: [overnight tape] — [sector effect on the US open]. *(only channels that cleared the material-move bar)*
+- **Net:** [tailwind / headwind / neutral overnight] — [single most-affected US sector].
+
+(Sector-level only — no watchlist tickers, and no number that isn't already in the Tape Table or the Asia/Europe grep. If nothing overnight clears the material-move bar, replace the bullets with one line: *"Overnight tape benign — no material spillover into the US open."* The channel set and gating are in `references/global-spillover-read.md`.)
 
 ---
 
