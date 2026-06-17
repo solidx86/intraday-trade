@@ -44,6 +44,10 @@
         {
           "text": "Global Spillover section covers Asia (Nikkei, Hang Seng, KOSPI, Shanghai), Europe (DAX, FTSE, STOXX), and USD/JPY",
           "type": "structural"
+        },
+        {
+          "text": "Global Spillover closes with a '→ US Spillover Read' block — sector-level transmission channels (China beta, yen carry, Europe→US, oil/rates) that translate the overnight tape into a US-open read, with a '**Net:**' tilt line — or, on a quiet overnight, collapses to the benign-tape fallback ('no material spillover into the US open'). Sector-level only: no watchlist tickers, no number that isn't already in the Tape Table or the Asia/Europe grep.",
+          "type": "qualitative"
         }
       ]
     },
