@@ -41,3 +41,43 @@ def test_order_preserved():
     rows = {"B": {"symbol": "B"}, "A": {"symbol": "A"}}
     out = fmd.order_rows(rows, ["A", "B"])
     assert [r["symbol"] for r in out] == ["A", "B"]
+
+
+import importlib
+vql = None
+def _load_vql():
+    global vql
+    if vql is None:
+        vql = importlib.import_module("validate_quote_ledger")
+    return vql
+
+LEDGER = [
+    {"symbol": "NVDA", "last": 208.47, "chg_pct": 0.51, "quote_type": "PRE-MKT"},
+    {"symbol": "AVGO", "last": 376.71, "chg_pct": -4.37, "quote_type": "PRIOR-CLOSE"},
+]
+
+def test_validator_passes_matching_tagged_numbers():
+    v = _load_vql()
+    md = ("- **NVDA** +0.51% ($208.47) *(pre-mkt)* — bounce.\n"
+          "- **AVGO** -4.37% ($376.71) *(prior close)* — context.\n")
+    assert v.validate(md, LEDGER) == []
+
+def test_validator_fails_premkt_tag_without_premkt_row():
+    v = _load_vql()
+    md = "- **AVGO** -4.37% ($376.71) *(pre-mkt)* — wrong tag.\n"
+    assert any("AVGO" in e and "PRE-MKT" in e for e in v.validate(md, LEDGER))
+
+def test_validator_fails_value_mismatch():
+    v = _load_vql()
+    md = "- **NVDA** +0.51% ($222.00) *(pre-mkt)* — wrong price.\n"
+    assert any("NVDA" in e and "208.47" in e for e in v.validate(md, LEDGER))
+
+def test_validator_fails_untagged_number():
+    v = _load_vql()
+    md = "- **NVDA** $208.47 — no tag.\n"
+    assert any("no session tag" in e.lower() for e in v.validate(md, LEDGER))
+
+def test_validator_group_tag_scopes_bullet():
+    v = _load_vql()
+    md = "- Semis **(pre-mkt)**: NVDA +0.51% ($208.47), and others.\n"
+    assert v.validate(md, LEDGER) == []
