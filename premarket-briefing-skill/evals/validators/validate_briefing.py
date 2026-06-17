@@ -187,6 +187,30 @@ def check_global_spillover(sections: dict[str, str]) -> CheckResult:
     return CheckResult("global_spillover_indices", True, "all 8 required indices/pairs present")
 
 
+def check_spillover_read(sections: dict[str, str]) -> CheckResult:
+    """Global Spillover must close with a → US Spillover Read synthesis block:
+    a fired-channel block carrying a **Net:** line, or the benign-tape fallback
+    ('no material spillover'). The benign line needs no Net line."""
+    body = sections.get("## Global Market Spillover", "")
+    has_marker = "US Spillover Read" in body
+    benign = "no material spillover" in body
+    if not has_marker and not benign:
+        return CheckResult(
+            "spillover_read",
+            False,
+            "no '→ US Spillover Read' block and no benign-tape fallback line",
+        )
+    if benign:
+        return CheckResult("spillover_read", True, "benign-tape spillover read (no Net line required)")
+    if re.search(r"\*\*Net:\*\*", body):
+        return CheckResult("spillover_read", True, "US Spillover Read block with Net line")
+    return CheckResult(
+        "spillover_read",
+        False,
+        "US Spillover Read block present but missing a '**Net:**' line",
+    )
+
+
 def run_all_checks(briefing_path: Path) -> list[CheckResult]:
     nonempty = check_file_nonempty(briefing_path)
     if not nonempty.passed:
