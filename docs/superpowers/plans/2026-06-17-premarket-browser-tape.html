@@ -43,7 +43,7 @@
   consolidated through one CNBC pre-markets "tape" load. Add four enforced 1.1 tape lines (Futures,
   Volatility, Sector tape, Commodities); unify the <code>N/A — reason</code> failure rule across tape
   numbers and per-ticker prices; keep the 7-section structure intact.</p>
-  <p>A new <strong>Phase C</strong> runs first: <code>browser_navigate</code> → grep the saved snapshot
+  <p>A new <strong>Step 3a</strong> runs first: <code>browser_navigate</code> → grep the saved snapshot
   → build a Tape Table that anchors every tape number. The four 1.1 lines, the regime read's US10Y
   direction, and most of Global Spillover route from it.</p>
 
@@ -54,10 +54,10 @@
 
   <h2>Tasks (all complete)</h2>
 
-  <h3>Task 1 — Phase C in SKILL.md</h3>
+  <h3>Task 1 — Step 3a in SKILL.md</h3>
   <ul>
-    <li class="done">Restructure Step 3 to three phases; document C → A → B order.</li>
-    <li class="done">Add Step 3a — Phase C: capture recipe, Tape Table, anchor rule, <code>N/A — reason</code> miss rule.</li>
+    <li class="done">Restructure Step 3 to three sub-steps; document 3a → 3b → 3c order.</li>
+    <li class="done">Add Step 3a — capture recipe, Tape Table, anchor rule, <code>N/A — reason</code> miss rule.</li>
     <li class="done">Rename old 3a/3b → 3b/3c; source US10Y/DXY from the Tape Table.</li>
   </ul>
 
@@ -70,8 +70,8 @@
 
   <h3>Task 3 — data-sources.md</h3>
   <ul>
-    <li class="done">Phase C section + browser-vs-WebFetch tiering table.</li>
-    <li class="done">Mark CNBC/Reuters/investing.com/forexfactory browser-primary; "Phase C first" notes on Spillover.</li>
+    <li class="done">Step 3a section + browser-vs-WebFetch tiering table.</li>
+    <li class="done">Mark CNBC/Reuters/investing.com/forexfactory browser-primary; "Step 3a first" notes on Spillover.</li>
     <li class="done">Graceful-degradation rewrite (tier escalation + <code>N/A — reason</code>).</li>
   </ul>
 

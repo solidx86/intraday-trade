@@ -4,7 +4,7 @@
 
 **Goal:** Wire the Playwright headless browser in as the primary path for the bot-walled structured-data sources (consolidated through one CNBC pre-markets "tape" load), add four enforced market-tape lines to section 1.1 (Futures, Volatility, Sector tape, Commodities), and unify the `N/A — reason` failure rule across tape numbers and per-ticker prices — keeping the 7-section output structure otherwise intact.
 
-**Architecture:** A new gather phase (Phase C) runs first: `browser_navigate` to `cnbc.com/markets/pre-markets/`, grep the saved snapshot, build a Tape Table scratch artifact that anchors every tape number. The four 1.1 lines, the regime read's US10Y direction, and most of Global Spillover route from the Tape Table. Validator gains four line-present checks (`N/A` counts as present); bite-tests prove they fire; both sample briefings and the eval rubric are updated to conform.
+**Architecture:** A new gather phase (Step 3a) runs first: `browser_navigate` to `cnbc.com/markets/pre-markets/`, grep the saved snapshot, build a Tape Table scratch artifact that anchors every tape number. The four 1.1 lines, the regime read's US10Y direction, and most of Global Spillover route from the Tape Table. Validator gains four line-present checks (`N/A` counts as present); bite-tests prove they fire; both sample briefings and the eval rubric are updated to conform.
 
 **Tech Stack:** Markdown (skill spec + references), Playwright MCP (browser capture), Python 3 (stdlib `validate_briefing.py`), pytest, JSON (evals).
 
@@ -16,8 +16,8 @@
 
 ## File Structure
 
-- **Modify** `premarket-briefing-skill/SKILL.md` — new Step 3a (Phase C: market tape), four 1.1 template lines, unified `N/A — reason` rule, Step 4 + regime/Spillover notes.
-- **Modify** `premarket-briefing-skill/references/data-sources.md` — Phase C section (capture recipe, grep patterns, VIX scale), browser/WebFetch tiering table, per-source browser-primary edits, graceful-degradation rewrite.
+- **Modify** `premarket-briefing-skill/SKILL.md` — new Step 3a (market tape), four 1.1 template lines, unified `N/A — reason` rule, Step 4 + regime/Spillover notes.
+- **Modify** `premarket-briefing-skill/references/data-sources.md` — Step 3a section (capture recipe, grep patterns, VIX scale), browser/WebFetch tiering table, per-source browser-primary edits, graceful-degradation rewrite.
 - **Modify** `premarket-briefing-skill/references/macro-regime-read.md` — tape-sourcing note for US10Y/DXY.
 - **Modify** `premarket-briefing-skill/evals/validators/validate_briefing.py` — add `check_tape_lines`, wire into `run_all_checks`, update docstring.
 - **Modify** `tests/test_premarket_validator.py` — bite-tests for the four tape checks.
@@ -29,13 +29,13 @@
 
 ---
 
-## Task 1: Phase C in SKILL.md
+## Task 1: Step 3a in SKILL.md
 
 **Files:** Modify `premarket-briefing-skill/SKILL.md`
 
-- [x] **Step 1: Restructure Step 3** from two phases to three; document the C → A → B running order and the phase-letter-is-identity note.
-- [x] **Step 2: Add Step 3a — Phase C: market tape (browser)** — the capture recipe (navigate → grep saved snapshot → never `browser_snapshot` without `filename`), the Tape Table scratch artifact, the anchor rule, and the `N/A — reason` miss rule. Note Phase C feeds the regime read and Global Spillover.
-- [x] **Step 3: Rename** the old `Step 3a — Phase A` / `Step 3b — Phase B` headers to `3b` / `3c`; update the regime-read bullet to source US10Y/DXY from the Tape Table.
+- [x] **Step 1: Restructure Step 3** from two sub-steps to three; document the 3a → 3b → 3c running order.
+- [x] **Step 2: Add Step 3a — market tape (browser)** — the capture recipe (navigate → grep saved snapshot → never `browser_snapshot` without `filename`), the Tape Table scratch artifact, the anchor rule, and the `N/A — reason` miss rule. Note Step 3a feeds the regime read and Global Spillover.
+- [x] **Step 3: Name** the news-harvest and targeted-lookup sub-steps `Step 3b` / `Step 3c` (uniform `Step 3a/3b/3c` scheme, no phase letters); update the regime-read bullet to source US10Y/DXY from the Tape Table.
 
 ## Task 2: Four 1.1 tape lines + unified N/A rule
 
@@ -49,15 +49,15 @@
 
 **Files:** Modify `premarket-briefing-skill/references/data-sources.md`
 
-- [x] **Step 1:** Add the Phase C section (recipe, grep patterns, Tape Table, VIX scale, fallbacks) and a browser-vs-WebFetch tiering table.
-- [x] **Step 2:** Mark CNBC/Reuters/investing.com/forexfactory sources browser-primary across Phase A, 1.2, earnings, and Global Spillover; add "Phase C first" notes to the Spillover sub-sections.
+- [x] **Step 1:** Add the Step 3a section (recipe, grep patterns, Tape Table, VIX scale, fallbacks) and a browser-vs-WebFetch tiering table.
+- [x] **Step 2:** Mark CNBC/Reuters/investing.com/forexfactory sources browser-primary across Step 3b, 1.2, earnings, and Global Spillover; add "Step 3a first" notes to the Spillover sub-sections.
 - [x] **Step 3:** Rewrite Graceful Degradation to escalate by tier and use `N/A — reason`.
 
 ## Task 4: macro-regime-read.md
 
 **Files:** Modify `premarket-briefing-skill/references/macro-regime-read.md`
 
-- [x] Add a sourcing note: US10Y/DXY direction comes from the Phase C Tape Table; fallbacks before `NEUTRAL`.
+- [x] Add a sourcing note: US10Y/DXY direction comes from the Step 3a Tape Table; fallbacks before `NEUTRAL`.
 
 ## Task 5: Validator + bite-tests (commit-green with fixtures)
 

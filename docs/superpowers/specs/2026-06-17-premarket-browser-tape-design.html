@@ -83,14 +83,14 @@
 
   <h2>Design</h2>
 
-  <h3>1. New gather phase — Phase C: market tape (browser)</h3>
+  <h3>1. New gather sub-step — Step 3a: market tape (browser)</h3>
   <p>A new sub-step (<code>SKILL.md</code> Step 3a) that runs <strong>first</strong> among the gather
-  phases. It navigates CNBC pre-markets, greps the saved snapshot, and builds a <strong>Tape Table</strong> —
+  sub-steps. It navigates CNBC pre-markets, greps the saved snapshot, and builds a <strong>Tape Table</strong> —
   a mandatory internal scratch artifact, sibling to the Step 1 date-anchor and Step 3.5 price-anchor
   tables. The Tape Table is the <strong>anchor</strong> for every tape number: nothing reaches the body
   unless its exact figure is in the grep output.</p>
-  <p>Phase A (news harvest) and Phase B (targeted lookups) keep their identities; the phase letters denote
-  identity, not running order. Execution order is <strong>C → A → B</strong>.</p>
+  <p>The news harvest (Step 3b) and targeted lookups (Step 3c) follow. Execution order is
+  <strong>3a → 3b → 3c</strong>.</p>
   <pre>Tape table (CNBC pre-markets, grepped HH:MM MYT):
   Futures:    ES &lt;fut&gt; (±%)  · NQ &lt;fut&gt; (±%)  · Dow &lt;fut&gt; (±%)  [implied-open Δ]
   Volatility: VIX &lt;lvl&gt; (±%) · VXN &lt;lvl&gt; (±%)
@@ -162,8 +162,8 @@
 
   <h2>Files touched</h2>
   <ul class="files">
-    <li>premarket-briefing-skill/SKILL.md &nbsp;<span class="tag">Phase C + 1.1 template + unified N/A rule</span></li>
-    <li>premarket-briefing-skill/references/data-sources.md &nbsp;<span class="tag">Phase C section + tiering + degradation</span></li>
+    <li>premarket-briefing-skill/SKILL.md &nbsp;<span class="tag">Step 3a + 1.1 template + unified N/A rule</span></li>
+    <li>premarket-briefing-skill/references/data-sources.md &nbsp;<span class="tag">Step 3a section + tiering + degradation</span></li>
     <li>premarket-briefing-skill/references/macro-regime-read.md &nbsp;<span class="tag">tape sourcing note</span></li>
     <li>premarket-briefing-skill/evals/validators/validate_briefing.py &nbsp;<span class="tag">4 checks</span></li>
     <li>premarket-briefing-skill/evals/evals.json &nbsp;<span class="tag">rubric line</span></li>

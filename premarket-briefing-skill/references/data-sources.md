@@ -1,6 +1,6 @@
 # Data Sources Reference
 
-This file maps the briefing's data gathering to the sources that work best, and to the **three-phase** workflow `SKILL.md` Step 3 runs: a market-tape pull (Phase C) for the structured numbers, a shared news harvest (Phase A) that feeds the narrative sections, then targeted lookups (Phase B) for the remaining structured-data sections. **Run Phase C first** — it's the macro backdrop the others read against. Use this file as a starting point — if a primary source fails or returns stale data, fall through to the alternates listed. **Never fabricate.** If a source is blocked or empty, say so in the output (`N/A — reason`).
+This file maps the briefing's data gathering to the sources that work best, and to the **three-step** workflow `SKILL.md` Step 3 runs: a market-tape pull (Step 3a) for the structured numbers, a shared news harvest (Step 3b) that feeds the narrative sections, then targeted lookups (Step 3c) for the remaining structured-data sections. **Run Step 3a first** — it's the macro backdrop the others read against. Use this file as a starting point — if a primary source fails or returns stale data, fall through to the alternates listed. **Never fabricate.** If a source is blocked or empty, say so in the output (`N/A — reason`).
 
 A note on date-scoping: always append the computed US trading date to your WebSearch queries (e.g., `"stock market today May 15 2026"`) so you don't get a year-old article ranked first.
 
@@ -10,7 +10,7 @@ The bot-walled, JS-heavy structured sources return **403/Cloudflare to WebFetch*
 
 | Source | Path | Note |
 |--------|------|------|
-| `cnbc.com` (pre-markets, quotes) | **browser-primary** | WebFetch 403s; the Phase C dashboard |
+| `cnbc.com` (pre-markets, quotes) | **browser-primary** | WebFetch 403s; the Step 3a dashboard |
 | `reuters.com/markets/us` | **browser-primary** | bot wall |
 | `investing.com` (calendar, indices, FX, earnings) | **browser-primary** | Cloudflare challenge |
 | `forexfactory.com/calendar` | **browser-primary** | Cloudflare challenge |
@@ -21,7 +21,7 @@ Don't waste a WebFetch round-trip on a known browser-primary source — go strai
 
 ---
 
-## Phase C — Market Tape (browser)
+## Step 3a — Market Tape (browser)
 
 One browser load of CNBC's pre-markets page yields almost every structured number the briefing needs — futures + implied open, VIX/VXN, sector performance, commodities, Treasury yields, FX, and Asia/Europe indices — so pull it **once, first**, and harvest the rest from the saved snapshot.
 
@@ -50,16 +50,16 @@ Tape table (CNBC pre-markets, grepped HH:MM MYT):
 
 **On a missing row** (page layout changed, module didn't load, navigation blocked): write the field as **`N/A — <one-clause reason>`**. Never guess, never substitute directional prose for a tape number.
 
-**What Phase C feeds:** the four section-1.1 tape lines; the 1.1 dollar/yields **regime read** (US10Y direction, DXY when present); and most of **Global Market Spillover** (Asia/Europe indices, FX, USD/JPY). When the tape pull succeeds, route those from the Tape Table instead of running separate WebSearches.
+**What Step 3a feeds:** the four section-1.1 tape lines; the 1.1 dollar/yields **regime read** (US10Y direction, DXY when present); and most of **Global Market Spillover** (Asia/Europe indices, FX, USD/JPY). When the tape pull succeeds, route those from the Tape Table instead of running separate WebSearches.
 
 **Fallback (only if the CNBC load fails entirely):**
-- Per-source browser fetches / WebSearches listed under Phase B and Global Spillover below.
+- Per-source browser fetches / WebSearches listed under Step 3c and Global Spillover below.
 - DXY/US10Y direction: CNBC `/quotes/.DXY` and `/quotes/US10Y` (browser), or investing.com.
 - Say in the affected lines that the tape pull failed and the number is from a fallback (or `N/A — reason`).
 
 ---
 
-## Phase A — Shared News Harvest
+## Step 3b — Shared News Harvest
 
 Fetch these four general-news pages **once each** and read each one broadly. Don't compose any output section while harvesting — extract what you find into the **catalyst inventory** (next section), then route from there.
 
@@ -85,7 +85,7 @@ It also **flags watchlist tickers** for Section 1.4 — see "The Catalyst Invent
 
 The catalyst inventory is an **intermediate scratch artifact** — internal working notes, like the Step 1 date-anchor table. It does **not** appear in the final briefing.
 
-As you read each Phase A page, record one row per distinct headline or mover:
+As you read each Step 3b page, record one row per distinct headline or mover:
 
 ```
 Catalyst                          | Seen in        | Feeds section(s)      | Watchlist ticker
@@ -105,9 +105,9 @@ Once the inventory is built, compose sections 1.1, 1.3, and Market News & Cataly
 
 ---
 
-## Phase B — Targeted Section Lookups
+## Step 3c — Targeted Section Lookups
 
-The structured-data sections can't be served by a homepage harvest — they need dedicated sources. The Phase A harvest feeds only 1.1, 1.3, and Market News & Catalysts; the sections below — 1.2, the finviz nets for 1.4, earnings actuals, and Global Spillover — each need their own Phase B lookup regardless of what the harvest surfaced.
+The structured-data sections can't be served by a homepage harvest — they need dedicated sources. The Step 3b harvest feeds only 1.1, 1.3, and Market News & Catalysts; the sections below — 1.2, the finviz nets for 1.4, earnings actuals, and Global Spillover — each need their own Step 3c lookup regardless of what the harvest surfaced.
 
 ### Section 1.2 — Economic Announcements Today
 
@@ -123,7 +123,7 @@ The structured-data sections can't be served by a homepage harvest — they need
 
 ### Section 1.3 — Sector gap-check
 
-Phase A's harvest is the **primary** source for Section 1.3. This gap-check catches a big sector mover the harvest didn't headline:
+Step 3b's harvest is the **primary** source for Section 1.3. This gap-check catches a big sector mover the harvest didn't headline:
 
 - `WebFetch https://finviz.com/groups.ashx?g=sector` — sector heat-map with the biggest movers per sector.
 
@@ -135,7 +135,7 @@ If the heatmap shows a notable mover with no story in the catalyst inventory, ru
 
 Section 1.4 is fed by **three nets**. A ticker reaches the 1.4 output if **any one** of them flags it:
 
-1. **Phase A harvest** — any watchlist ticker flagged in the catalyst inventory. Catches a CNBC / MarketWatch / Reuters front-page story finviz's quote page never lists.
+1. **Step 3b harvest** — any watchlist ticker flagged in the catalyst inventory. Catches a CNBC / MarketWatch / Reuters front-page story finviz's quote page never lists.
 2. **finviz per-ticker sweep** — `WebFetch https://finviz.com/quote.ashx?t=[TICKER]` for every watchlist ticker. One page gives recent headlines, analyst actions, earnings dates, pre-market % move, and key levels. This is the systematic full-watchlist scan **and** the Step 3.5 price-anchor pull.
 3. **Supplemental per-ticker WebSearch** — for any ticker flagged with news by net 1 or net 2:
    - `WebSearch "[TICKER] stock news [DATE]"`
@@ -152,7 +152,7 @@ Section 1.4 is fed by **three nets**. A ticker reaches the 1.4 output if **any o
 
 ### Earnings Reports (inside "Market News & Catalysts")
 
-The rest of **Market News & Catalysts** — the top-5 headlines and the M&A / regulatory / geopolitical items — comes from the Phase A harvest. Only this earnings sub-section needs a dedicated calendar lookup.
+The rest of **Market News & Catalysts** — the top-5 headlines and the M&A / regulatory / geopolitical items — comes from the Step 3b harvest. Only this earnings sub-section needs a dedicated calendar lookup.
 
 **Primary:**
 - `browser_navigate https://www.investing.com/earnings-calendar/` — Cloudflare-blocks WebFetch; grep the saved snapshot, filter to today, US-only
@@ -167,7 +167,7 @@ The rest of **Market News & Catalysts** — the top-5 headlines and the M&A / re
 
 ### Global Spillover — Asia Indices
 
-**Phase C first:** the CNBC tape pull already carries Nikkei, Hang Seng, Shanghai (and ASX/STI). Route from the Tape Table; only run the searches below for an index the tape missed (e.g. KOSPI, which CNBC may not list) or to get the *theme* behind a move.
+**Step 3a first:** the CNBC tape pull already carries Nikkei, Hang Seng, Shanghai (and ASX/STI). Route from the Tape Table; only run the searches below for an index the tape missed (e.g. KOSPI, which CNBC may not list) or to get the *theme* behind a move.
 
 - `WebSearch "Nikkei 225 close [DATE]"`
 - `WebSearch "Hang Seng close [DATE]"`
@@ -179,7 +179,7 @@ The rest of **Market News & Catalysts** — the top-5 headlines and the M&A / re
 
 ### Global Spillover — Europe Indices
 
-**Phase C first:** the CNBC tape pull carries DAX, FTSE, CAC, and STOXX. Route from the Tape Table; use the searches below only for a missing index or the driving theme.
+**Step 3a first:** the CNBC tape pull carries DAX, FTSE, CAC, and STOXX. Route from the Tape Table; use the searches below only for a missing index or the driving theme.
 
 - `WebSearch "DAX FTSE KOSPI KLCI STOXX [DATE]"`
 - `browser_navigate https://www.investing.com/indices/europe-indices` (Cloudflare-blocks WebFetch)
@@ -188,7 +188,7 @@ The rest of **Market News & Catalysts** — the top-5 headlines and the M&A / re
 
 ### Global Spillover — USD/JPY
 
-**Phase C first:** USD/JPY (and EUR/USD, etc.) come from the CNBC tape pull. Use the sources below only if the tape missed the pair.
+**Step 3a first:** USD/JPY (and EUR/USD, etc.) come from the CNBC tape pull. Use the sources below only if the tape missed the pair.
 
 - `WebSearch "USD JPY [DATE]"`
 - `browser_navigate https://www.investing.com/currencies/usd-jpy` (Cloudflare-blocks WebFetch)
