@@ -93,7 +93,8 @@
   (<code>last_time</code>), and the prior close (<code>previous_day_closing</code>) — in one no-auth batch
   call, from the same data behind the four CNBC market pages the briefing already references.</div>
 
-  <h3>Yahoo v7 quote — CROSS-CHECK + FALLBACK (verified)</h3>
+  <h3>Yahoo v7 quote — verified, but NOT used (dropped for simplicity)</h3>
+  <p><strong>Decision:</strong> Yahoo was probed and works, but the final design is <strong>CNBC-only</strong> — CNBC already supplies typed pre-market, timestamp, prior close, and exact-symbol echo, so the Yahoo cross-check and fallback (and the crumb auth dance) are dropped. The note below is retained as the record of what was verified, should a fallback ever be reinstated.</p>
   <p><code>query1.finance.yahoo.com/v7/finance/quote?symbols=&lt;list&gt;</code> returns 401 bare, but the
   <strong>crumb+cookie flow runs in stdlib</strong> (seed cookie at <code>fc.yahoo.com</code> → crumb at
   <code>/v1/test/getcrumb</code> → quote). Verified return incl. <code>ES=F, ^VIX, ^TNX, EURUSD=X, ^GDAXI,
@@ -107,7 +108,7 @@
 
   <h2>Goals</h2>
   <ul>
-    <li>Replace model-read numbers with a <strong>scripted fetch</strong> from CNBC's JSON (tape + per-ticker), Yahoo as cross-check/fallback.</li>
+    <li>Replace model-read numbers with a <strong>scripted fetch</strong> from CNBC's JSON (tape + per-ticker). CNBC-only — no Yahoo.</li>
     <li>Make quote-type (<code>PRE-MKT</code> / <code>PRIOR-CLOSE</code> / <code>N/A</code>), timestamp, and exact-symbol matching <strong>mechanical</strong>.</li>
     <li>Add a <strong>validator</strong> that fails the briefing if any printed number can't be tied to the machine ledger.</li>
     <li>Retire the browser as a <em>number</em> source (it stays for news/themes) — also eliminating the "snapshot didn't render" failure hit twice on 2026-06-17.</li>
@@ -121,24 +122,24 @@
     <thead><tr><th>Source</th><th>Role</th></tr></thead>
     <tbody>
       <tr><td>CNBC <code>quote.htm</code> JSON</td><td><strong>Primary</strong> for every number — tape (futures, VIX/VXN, sectors, commodities, US yields, FX, all global indices) <em>and</em> per-ticker.</td></tr>
-      <tr><td>Yahoo v7 (+crumb)</td><td><strong>Cross-check</strong> on the headline name(s) + <strong>fallback</strong> when CNBC fails or a symbol doesn't resolve.</td></tr>
+      <tr><td>Yahoo v7 (+crumb)</td><td><strong>Not used</strong> — verified working, but dropped for simplicity (CNBC-only). See the Yahoo section + decision log.</td></tr>
       <tr><td>finviz <code>quote.ashx</code></td><td>Non-price only: headlines, analyst actions, earnings dates. Documented as "price = prior close, banned as the printed number."</td></tr>
-      <tr><td>Headless browser</td><td>News/theme prose (Step 3b) only; last-resort number fallback if both JSON sources fail.</td></tr>
+      <tr><td>Headless browser</td><td>News/theme prose (Step 3b) only; the manual last-resort for numbers if CNBC fails.</td></tr>
       <tr><td>WebSearch</td><td>Story/context only. <strong>Never</strong> a printed price/%.</td></tr>
     </tbody>
   </table>
 
   <h3>2. The fetch script — <code>scripts/fetch_market_data.py</code> (new)</h3>
-  <p>Stdlib only (<code>urllib</code>, <code>json</code>, <code>http.cookiejar</code>,
-  <code>concurrent.futures</code>) so it runs under the PEP-668-locked system <code>python3</code> with no
-  <code>pip</code>. Invoked by the agent via one Bash call at Step 3.5; the agent consumes stdout verbatim and
-  never reads a price off a page.</p>
+  <p>Stdlib only (<code>urllib</code>, <code>json</code>, <code>re</code>) so it runs under the PEP-668-locked
+  system <code>python3</code> with no <code>pip</code>. CNBC accepts a batched symbol list in one request, so no
+  threadpool and no second-endpoint auth are needed. Invoked by the agent via one Bash call at Step 3.5; the agent
+  consumes stdout verbatim and never reads a price off a page.</p>
   <ul>
     <li><strong>Inputs:</strong> the per-ticker watchlist (read from <code>watchlist.md</code>) plus a fixed <strong>tape symbol map</strong> (CNBC symbology — e.g. <code>@ES.1 @NQ.1 @YM.1 .VIX .VXN US10Y @CL.1 @GC.1 @NG.1 EUR= JPY= .N225 .HSI .SSEC .KS11 .GDAXI .FTSE .STOXX50E</code>, sectors via index or SPDR ETF). The complete map is finalized at build time; any symbol that fails to resolve emits <code>N/A</code>, never a guess.</li>
     <li><strong>Concurrency:</strong> batch request first (CNBC accepts a <code>|</code>-joined list in one call). If per-symbol requests are needed (fallback/Yahoo), a <code>ThreadPoolExecutor(max_workers≈8)</code> inside the script. Output is <strong>sorted by input order</strong> so the ledger is byte-identical regardless of completion order.</li>
     <li><strong>Quote-type derivation (mechanical):</strong> <code>PRE-MKT</code> when <code>ExtendedMktQuote.type == "PRE_MKT"</code> with a today-dated <code>last_time</code>; else <code>PRIOR-CLOSE</code>; <code>N/A</code> on fetch failure or symbol-echo mismatch.</li>
     <li><strong>Symbol/class gate:</strong> the response <code>symbol</code> must equal the requested symbol; a mismatch (e.g. <code>GOOG</code>≠<code>GOOGL</code>) → rejected to <code>N/A</code>.</li>
-    <li><strong>Cross-check:</strong> for the headline name(s), also fetch Yahoo and compare; disagreement beyond tolerance (&gt;0.3% or opposite sign) → flag/<code>N/A</code>.</li>
+    <li><strong>No cross-check, no Yahoo:</strong> CNBC is the single source; any miss is <code>N/A</code> (never guessed). The symbol-echo check (response <code>symbol</code> must equal the request) is what prevents a GOOG-for-GOOGL substitution, and it lives in the CNBC parser.</li>
     <li><strong>Outputs:</strong> a JSON sidecar <code>daily/&lt;US-date&gt;/.quote-ledger.json</code> (machine source of truth for the validator) and a human-readable markdown ledger to stdout (what the model pastes into scratch).</li>
     <li><strong>Failure = N/A, never a guess.</strong> Broad outage → the briefing prints <code>N/A</code> and says so.</li>
   </ul>
@@ -222,7 +223,7 @@
     <tbody>
       <tr><td>Fix depth</td><td>Full Step 3.5 redesign</td></tr>
       <tr><td>Determinism mechanism</td><td>Scripted fetch + scripted validate</td></tr>
-      <tr><td>Primary price source</td><td>CNBC <code>quote.htm</code> JSON (after verifying both); Yahoo cross-check/fallback</td></tr>
+      <tr><td>Primary price source</td><td>CNBC <code>quote.htm</code> JSON <strong>only</strong> — Yahoo verified but dropped for simplicity; browser CNBC pages = manual last-resort</td></tr>
       <tr><td>Tape coverage</td><td>Full (tape + per-ticker), gated on endpoint verification — now cleared</td></tr>
       <tr><td>Concurrency</td><td>Inside the script (batch-first, threadpool fallback); not agent/subagent fan-out</td></tr>
       <tr><td>News</td><td>Numbers only — browser news harvest unchanged</td></tr>
