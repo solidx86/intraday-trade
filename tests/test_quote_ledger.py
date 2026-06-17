@@ -29,3 +29,15 @@ def test_parse_cnbc_symbol_echo_mismatch_is_na():
     rows2 = fmd.parse_cnbc(FIX.read_text(), ["MSFT"])
     assert rows2["MSFT"]["quote_type"] == "N/A"
     assert "not returned" in rows2["MSFT"]["note"]
+
+def test_format_markdown_columns():
+    ledger = [{"symbol":"NVDA","prior_close":207.41,"last":208.47,"chg_pct":0.51,
+               "timestamp":"9:18 AM EDT","source":"CNBC","quote_type":"PRE-MKT","note":""}]
+    md = fmd.format_markdown(ledger)
+    assert "NVDA" in md and "PRE-MKT" in md and "208.47" in md
+    assert md.splitlines()[0].startswith("| symbol")
+
+def test_order_preserved():
+    rows = {"B": {"symbol": "B"}, "A": {"symbol": "A"}}
+    out = fmd.order_rows(rows, ["A", "B"])
+    assert [r["symbol"] for r in out] == ["A", "B"]
