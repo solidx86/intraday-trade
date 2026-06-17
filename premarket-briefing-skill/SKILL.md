@@ -68,37 +68,47 @@ Read `watchlist.md` in this skill's directory. Extract every ticker symbol (they
 
 Read `references/data-sources.md` for the source lists, the market-tape capture recipe, and the catalyst-inventory format. Gather data in three sub-steps, **in order** — the tape first (it's the macro backdrop the others read against), then the news harvest, then targeted lookups:
 
-1. **Step 3a — market tape** (browser): the structured numbers — futures + implied open, volatility, sector rotation, commodities, Treasury yields, FX, and global indices — from one CNBC load.
+1. **Step 3a — market tape + price ledger** (scripted): every number — futures, volatility, sector rotation, commodities, Treasury yields, FX, global indices, **and** per-ticker quotes — from one scripted CNBC fetch into a machine ledger.
 2. **Step 3b — shared news harvest**: the narrative pages.
-3. **Step 3c — targeted lookups**: the per-section structured sources (calendar, per-ticker prices, earnings).
+3. **Step 3c — targeted lookups**: the per-section structured sources (calendar, per-ticker *news*, earnings).
 
-#### Step 3a — market tape (browser)
+#### Step 3a — market tape + price ledger (scripted)
 
-The bot-walled structured sources (CNBC, Reuters, investing.com, forexfactory) return **403/Cloudflare to WebFetch** — fetch them with the headless browser instead. One `browser_navigate` to CNBC's pre-markets page yields almost every structured number the briefing needs, so pull it **once, first**, and harvest the rest from the saved snapshot.
+**Every number in the briefing — tape and per-ticker — comes from one scripted CNBC fetch, never from a model-read page.** The script `scripts/fetch_market_data.py` pulls CNBC's structured `quote.htm` JSON for the whole tape (futures, VIX/VXN, sector ETFs, commodities, US10Y, FX, Asia/Europe indices) **and** every watchlist ticker in a single batched request, then writes a machine ledger sidecar and prints a markdown ledger. This one call serves both the Tape Table here and the Step 3.5 price anchor — run it **once, first**.
 
-**Capture recipe (follow exactly — the raw page must never enter context):**
-
-1. `browser_navigate` to `https://www.cnbc.com/markets/pre-markets/`. This writes the full page snapshot to a `.playwright-mcp/page-*.yml` file on disk and returns only a tiny confirmation (page title + file path).
-2. **`grep` the saved snapshot file** for the data rows — never read the whole file. The numbers live in `row "<LABEL> <value> <chg> <%chg>"` lines plus the futures/implied-open table blocks. Example: `grep -oE 'row "[^"]+"' <file> | grep -E 'GOLD|OIL|NAT GAS|VIX|VXN|US 10-YR|EUR/USD|USD/JPY|NIKKEI|DAX|FTSE'`, and read the Dow/S&P/Nasdaq futures blocks by line range.
-3. **Never call `browser_snapshot` without a `filename`** — that returns the ~100k-char page into context and blows the token budget. The navigate already saved the file; grep that.
-
-See `references/data-sources.md` → "Step 3a — Market Tape" for the full grep patterns and the VIX classification scale.
-
-**Build the Tape Table** (a mandatory internal scratch artifact, sibling to the Step 1 date-anchor and Step 3.5 price-anchor tables — it does not appear in the briefing):
+**Run it (resolve the skill symlink to the real repo root first, then):**
 
 ```
-Tape table (CNBC pre-markets, grepped HH:MM MYT):
-  Futures:    ES <fut> (±%)  · NQ <fut> (±%)  · Dow <fut> (±%)  [implied-open Δ]
+python3 <skill-dir>/scripts/fetch_market_data.py <watchlist symbols> \
+  --out <repo-root>/data/trade-journal/daily/<US-date>/.quote-ledger.json
+```
+
+- `<watchlist symbols>` = the tickers from Step 2 (space-separated). The tape symbols are built in automatically; you only pass tickers.
+- The `--out` path **must** be the `.quote-ledger.json` sidecar next to the `premarket.md` you'll write in Step 5 — the validator and the PostToolUse hook locate it by that exact sibling path. Create the `daily/<US-date>/` folder first if needed.
+- The script prints the ledger as a markdown table (one row per symbol: `prior_close · last · chg_pct · timestamp · source · quote_type`). **Consume that printed table verbatim. Never read a price off a web page.**
+
+**`quote_type` is the determinism contract** — each row is exactly one of:
+- `PRE-MKT` — a live pre-market print (CNBC `ExtendedMktQuote.type == PRE_MKT` with a timestamp). This is today's move; tag it `(pre-mkt)`.
+- `PRIOR-CLOSE` — no pre-market print available; the number is the prior completed session's close. Tag it `(prior close)` — it is **not** today's move.
+- `N/A` — CNBC didn't return a usable number for that exact symbol. Tag it `(N/A — reason)`. Never substitute a guessed figure or a number from a search snippet.
+
+**Build the Tape Table** (mandatory internal scratch, sibling to the Step 1 date-anchor table — it does not appear in the briefing) by reading the tape rows straight out of the printed ledger:
+
+```
+Tape table (CNBC ledger, fetched HH:MM MYT):
+  Futures:    ES <fut> (±%)  · NQ <fut> (±%)  · Dow <fut> (±%)
   Volatility: VIX <lvl> (±%) · VXN <lvl> (±%)
-  Sectors:    <leader> +x% … <laggard> −y%
+  Sectors:    <leader> +x% … <laggard> −y%   (from the XL* sector-ETF rows)
   Commodities:WTI <lvl> · Gold <lvl> · NatGas <lvl>
-  Yields/FX:  US10Y <%> · DXY <dir> · EUR/USD <lvl> · USD/JPY <lvl>
-  Global:     Nikkei <±%> · HSI <±%> · DAX <±%> · FTSE <±%> · STOXX <±%>
+  Yields/FX:  US10Y <%> · EUR/USD <lvl> · USD/JPY <lvl>
+  Global:     Nikkei <±%> · HSI <±%> · Shanghai <±%> · KOSPI <±%> · DAX <±%> · FTSE <±%> · STOXX <±%>
 ```
 
-**The Tape Table is the anchor for every tape number.** No futures %, VIX/VXN level, sector %, or commodity price may appear in the briefing body unless that exact figure is in the grepped Tape Table. If a row didn't come back from the grep (page layout changed, module didn't load, navigation blocked), the corresponding field is written **`N/A — <one-clause reason>`** — never a guessed number, never directional prose standing in for the number.
+**The ledger is the anchor for every tape number.** No futures %, VIX/VXN level, sector %, or commodity price may appear in the body unless that exact figure is a non-`N/A` row in the printed ledger. Any ledger row that came back `N/A` is written **`N/A — <reason>`** in the body — never a guessed number, never directional prose standing in for the number.
 
-Step 3a also feeds the section 1.1 dollar/yields **regime read** (US10Y direction; DXY direction when present) and most of **Global Market Spillover** (Asia/Europe indices, FX). When the tape pull succeeds, those don't need separate WebSearches — route them from the Tape Table. If the CNBC load fails entirely, fall back to the per-source browser fetches and WebSearches in `references/data-sources.md`, and say so in the affected lines.
+Step 3a also feeds the section 1.1 dollar/yields **regime read** (US10Y direction; DXY when present) and most of **Global Market Spillover** (Asia/Europe indices, FX). Route those from the ledger — no separate WebSearches.
+
+**Manual last-resort (numbers only):** if the script fails entirely (network down, CNBC endpoint changed), the browser CNBC pages (`/markets/pre-markets/`, grep the saved `.playwright-mcp/page-*.yml`) are the documented fallback for tape numbers — say so in the affected lines. The browser pages remain the **primary** source for news/themes in Step 3b regardless; only the *numbers* are scripted.
 
 #### Step 3b — shared news harvest
 
@@ -113,7 +123,7 @@ This single harvest feeds three output sections: **1.1 General Market News**, **
 For the structured-data sections, run the dedicated sources in `references/data-sources.md`:
 - **1.2 Economic Announcements Today** — forexfactory / investing.com calendar.
 - **1.3 sector gap-check** — finviz `groups.ashx` heatmap, to catch a big sector mover the harvest didn't headline.
-- **1.4 Portfolio News** — finviz `quote.ashx` per ticker (this fetch is also the Step 3.5 price-anchor pull), plus supplemental per-ticker WebSearch for tickers with news.
+- **1.4 Portfolio News** — finviz `quote.ashx` per ticker for **news / analyst actions / earnings dates only** (its price is the prior session's close — never the printed number; prices come from the Step 3a ledger), plus supplemental per-ticker WebSearch for tickers with news.
 - **Earnings** — investing.com earnings calendar.
 - **Global Market Spillover** — Asia/Europe indices and USD/JPY from the Step 3a tape, topped up from CNBC `asia-markets/` + `europe-markets/` (browser) for indices the tape misses (KOSPI especially) and the per-region themes. Then compose the **→ US Spillover Read** block per `references/global-spillover-read.md` — sector-level transmission channels, gated to material moves, collapsing to one benign line on a quiet tape.
 - **Dollar & yields regime read** — **US10Y** (and **DXY** when present) come from the Step 3a Tape Table; only fetch them here if the tape pull missed them. Read both as evidenced *prior-close → now* pairs (direction vs the prior US cash-session close, 16:00 ET). Direction is what the read needs; an exact level is optional. See `references/macro-regime-read.md`. Feeds the 1.1 regime line and the Global Spillover tape.
@@ -127,39 +137,35 @@ For the structured-data sections, run the dedicated sources in `references/data-
 
 The **catalyst inventory captures the *story*** (what happened, which sections it touches); the **Step 3.5 anchor table below captures the *number*** (the verified price/percent). Keep them distinct — never let a number from the harvest reach the briefing body without going through Step 3.5.
 
-### Step 3.5 — Build the price/quote anchor table (MANDATORY — do this before writing any specific price or %)
+### Step 3.5 — The price anchor is the scripted ledger (MANDATORY — three gates before any price or %)
 
-This step exists for the same reason as Step 1: when the model writes a specific price ($229.72) or move (+3.3%) without an explicit anchor, it can confabulate — especially when a real bullish catalyst exists in context but the actual tape is moving the opposite direction. The fix is the same: compute the anchors **once, explicitly**, and re-check them every time a number is written.
+The Step 3a ledger **is** the price/quote anchor table. There is no separate manual fetch: every per-ticker price and percent in the body is a row the script already wrote. Your job in this step is not to gather numbers — it is to pass every number you write through three gates against that ledger.
 
-**Why this step exists (the incident):** On 2026-05-19 a real DA Davidson NVDA target raise ($250→$300, dated 2026-05-18) was in the briefing's context, but the actual tape was selling NVDA down ~1.3%. The model rationalized the "missing" gap-up: it invented "NVDA pre-market $229.72 (+3.3%)" and mislabeled the actual current price ($222.32) as the prior session's close to make the fabricated gap internally consistent. The "biggest setup of the day" recommendation cascaded across five sections. A voice rule ("never fabricate") could not defend against this — the model has to be structurally forced to write down the fetched price *before* composing the narrative around it.
+**Why this is scripted, not model-read (the incidents):**
 
-**The triggering rule:** every ticker that will appear in the briefing body with a specific dollar price OR a specific percent move MUST have an entry in this table.
+- *2026-05-19 (confabulation):* a real DA Davidson NVDA target raise ($250→$300) was in context while the tape was selling NVDA down ~1.3%. The model invented "NVDA pre-market $229.72 (+3.3%)" and relabeled the real price ($222.32) as the prior close to make the fabricated gap consistent. It cascaded across five sections. A voice rule ("never fabricate") can't defend against this — the number has to be written by a script before any narrative forms around it.
+- *2026-06-17 (mislabel + wrong class):* finviz's free `quote.ashx` serves the prior *completed* session, so Tuesday's close-to-close moves printed as Wednesday "pre-market" (AAPL "+0.95%", GOOGL "+1.06%" were the prior day). A cross-check then pulled a number from a WebSearch snippet that was the wrong share class — GOOG (Class C) for GOOGL (Class A). Fix: numbers now come only from the scripted CNBC ledger — exact-symbol verified, pre-market typed — and a validator + PostToolUse hook reject any unbacked number.
 
-**Required actions:**
+**The three gates** (apply to every `$price` and every `±%` before it reaches the body):
 
-1. From your draft of sections 1.1, 1.3, 1.4, Quick Summary, and Market News & Catalysts, list every ticker you intend to quote with a number. If a ticker appears in two sections it still appears once in this anchor table — the table is per-ticker, not per-mention.
+1. **Pre-market gate.** Print a number as *today's move* only if its ledger row is `quote_type == PRE-MKT`. A `PRIOR-CLOSE` row is last session's close — tag it `(prior close)` and never frame it as a pre-market move. An `N/A` row becomes `(N/A — reason)`. This is the gate that stops a stale close being sold as a pre-market gap.
 
-2. For each listed ticker, `WebFetch https://finviz.com/quote.ashx?t=TICKER` **in this session** (not from prior context, not from text already written, not from a remembered prior fetch). Record:
+2. **Symbol / class gate.** Quote only symbols that have a ledger row under the **exact watchlist symbol**. The script echo-verifies the symbol (a requested ticker CNBC doesn't return — or returns under a different class like GOOG for GOOGL — is forced to `N/A`, never silently swapped). So if the ledger has no `GOOGL` row, you write `(N/A — not returned)`, never a GOOG price.
 
-   ```
-   Ticker | Prior close | Current/pre-mkt | Δ% | Source URL | Fetched at (MYT)
-   NVDA   | $225.32     | $222.32         | −1.33% | https://finviz.com/quote.ashx?t=NVDA | 21:30 MYT
-   ...
-   ```
+3. **Provenance gate.** Every body number traces to a ledger row — full stop. No price or percent may come from a WebSearch snippet, a finviz quote page, a news homepage, or prior conversation text. finviz and the harvest supply the *story*; the ledger supplies the *number*. If a number isn't in the ledger, it isn't in the briefing.
 
-3. **No specific price or % may appear in the briefing body unless that exact number appears in the anchor table.** If the finviz fetch didn't produce a usable number (page blocked, ambiguous, mid-session intraday data, etc.), write **`N/A — <one-clause reason>`** in place of the number (e.g., *"NVDA N/A — finviz returned mid-session data, no clean pre-market quote"*) — never a guessed figure, and never directional prose substituting for the number. This is the same `N/A — reason` rule the Step 3a tape lines use; failures are stated and explained, not softened.
+**Cross-check the catalyst against the move (the read, not a gate).** If the headline is bullish (analyst raise, positive earnings, buyback) but the ledger shows the stock down, *that mismatch is the story* and it usually inverts the trade recommendation — lead with it ("DA Davidson raised target $250→$300 but NVDA is fading −1.3% pre-market — the chip de-risk is winning over the bullish call"). Never narrate a move that merely *matches* a catalyst's direction unless the ledger confirms it.
 
-4. **The ticker driving the #1 recommendation in Quick Summary must be re-fetched in this step regardless of what you think you know.** This is the highest-blast-radius number in the briefing — a wrong NVDA pre-market % cascades into AMD, AVGO, the whole #1 trade thesis, and the "don't carry through earnings" warning. Pay the WebFetch cost for the headline name every single run.
+**Don't propagate a price across sections from prose.** When a ticker appears in 1.1, 1.3, 1.4, and Quick Summary, re-check each mention against the ledger row — copying from the prior section's sentence is exactly how the May 2026 bug cascaded.
 
-5. **Cross-check the catalyst against the move.** If the headline is bullish (analyst raise, positive earnings, buyback) but the anchor table shows the stock down, *that mismatch is the story* — and it usually inverts the trade recommendation. Lead the section with that mismatch ("DA Davidson raised target $250→$300 but NVDA is fading −1.3% pre-market — the chip de-risk is winning over the bullish call"). Never narrate a price move that matches the catalyst's direction unless the anchor table confirms it.
+**Final self-check (before Step 5 save):**
+- Scan the finished briefing for every `$NNN.NN` and every `±N.N%`. For each, point at its ledger row (per-ticker prices) or tape ledger row (futures, VIX/VXN, sectors, commodities). If you can't, replace it with `(N/A — reason)` or delete the line.
+- Every number carries a session tag (`(pre-mkt)` / `(prior close)` / `(N/A — reason)`) whose type matches its ledger row's `quote_type`.
+- Every ticker matches its watchlist symbol exactly (no class drift).
+- No number traces to a WebSearch snippet or a read web page.
+- Run `python3 scripts/validate_quote_ledger.py <briefing.md> <ledger.json>` and fix or `N/A` every reported violation **before** presenting. (The PostToolUse hook runs this automatically on save and **blocks** the write on any violation — running it yourself first avoids a blocked save.)
 
-**Anti-bug rules for the body:**
-
-- **Do not propagate a price across sections from text-in-context.** When NVDA's price appears in section 1.1, 1.3, 1.4, and Quick Summary, every one of those mentions must be cross-checked against the anchor table at write time. Copying from the prior section's prose is exactly how the May 2026 NVDA bug cascaded.
-- **If a price "feels right" because the catalyst suggests it should be that direction, STOP.** Re-fetch finviz. The confabulation always wins when you trust the narrative more than the quote.
-- **Fix wrong prices by re-fetching, not by editing the wording.** The anchor table is the source of truth; the body must be made consistent with it, not the other way around.
-
-**Final self-check (before Step 5 save):** scan the completed briefing for every `$NNN.NN` and every `±N.N%`. For each, point at the row in the anchor table (ticker prices) or the Tape Table (futures, VIX/VXN, sectors, commodities) that justifies it. If you can't, replace the number with **`N/A — <reason>`**, or delete the line entirely. **A briefing with one missing number is useful. A briefing with one fabricated number destroys the user's edge.**
+**A briefing with one missing number is useful. A briefing with one fabricated number destroys the user's edge.**
 
 ### Step 4 — Fill the template
 
@@ -178,6 +184,19 @@ Fill section 1.1's four tape lines (Futures, Volatility, Sector tape, Commoditie
 
 Use this exact structure. Section numbering matches the user's original prompt — don't renumber.
 
+**Number-tag convention (mandatory).** Every per-ticker and tape number carries a session tag that maps 1:1 to its ledger `quote_type`:
+
+- `(pre-mkt)` — a live pre-market print (ledger `PRE-MKT`); this is today's move.
+- `(prior close)` — last completed session's close (ledger `PRIOR-CLOSE`); **not** today's move.
+- `(N/A — reason)` — no usable ledger number (ledger `N/A`); state the reason, never a guess.
+
+Worked examples:
+- `- **NVDA** +0.51% ($208.47) *(pre-mkt)* — bouncing with semis.`
+- `- **AVGO** −4.37% ($376.71) *(prior close)* — no pre-market print yet; this is Tuesday's close.`
+- `- **LUNR** *(N/A — no pre-market quote)* — headline only, no verified number.`
+
+A **group tag scopes a whole bullet** when several names share a session — put the tag on the bullet and quote the members under it: `- Semis **(pre-mkt)**: NVDA +0.51% ($208.47), AMD +1.2% ($141.30) …`. The validator and hook read the tag per line, so one tag covers every number on that line.
+
 ```
 # Pre-Market Briefing — [YYYY-MM-DD] (US Session)
 
@@ -193,10 +212,10 @@ The 3 most important things happening in the market today:
 - **[Headline]** — [Why it matters]
 - **[Headline]** — [Why it matters]
 
-**Futures (implied open):** ES [±%] · NQ [±%] · Dow [±%] — [one clause: firm / soft / mixed into the open]
-**Volatility:** VIX [lvl] ([±%]) · VXN [lvl] ([±%]) — **[calm / normal / elevated / high]**
-**Sector tape:** [leader] [+x%] lead · [laggard] [−y%] lag — [one clause: where the rotation is]
-**Commodities:** WTI $[lvl] · Gold $[lvl] · NatGas $[lvl] — [one clause only if a move matters; else omit clause]
+**Futures (implied open):** ES [±%] · NQ [±%] · Dow [±%] *([pre-mkt/prior close])* — [one clause: firm / soft / mixed into the open]
+**Volatility:** VIX [lvl] ([±%]) · VXN [lvl] ([±%]) *([pre-mkt/prior close])* — **[calm / normal / elevated / high]**
+**Sector tape:** [leader] [+x%] lead · [laggard] [−y%] lag *([pre-mkt/prior close])* — [one clause: where the rotation is]
+**Commodities:** WTI $[lvl] · Gold $[lvl] · NatGas $[lvl] *([pre-mkt/prior close])* — [one clause only if a move matters; else omit clause]
 
 **Market mood:** **RISK-ON** / **RISK-OFF** — [one sentence why]
 
@@ -226,7 +245,7 @@ Prefix any HIGH-impact row with ⚠️ in the Impact column.
 The biggest stock-specific or sector moves today, with a clear reason. Skip sectors with no news.
 
 **Technology / AI / Chips**
-- [TICKER ±%] — [What happened, 1 sentence] — [Which other stocks in the sector might be affected]
+- **[TICKER]** [±%] ($[price]) *([pre-mkt/prior close])* — [What happened, 1 sentence] — [Which other stocks in the sector might be affected]
 
 **Energy / Oil**
 - [TICKER ±%] — …
@@ -249,7 +268,7 @@ Scan every ticker in `watchlist.md`, then **report only the ones with something 
 Group the entries by the watchlist's own theme sections (Mega-cap Tech, Software / Enterprise, Semis, AI infrastructure / Compute, etc.). Skip any group where no ticker has news.
 
 **[Theme group, e.g. Semis]**
-- **[TICKER]** [±% if moving pre-market] — [News or catalyst, 1 sentence.] [If caution warranted: one sentence why.]
+- **[TICKER]** [±% if moving] ($[price]) *([pre-mkt/prior close])* — [News or catalyst, 1 sentence.] [If caution warranted: one sentence why.]
 
 You still scan the whole watchlist — only the output is filtered. A sector catalyst from 1.3 that touches a watchlist name belongs here too; name the affected tickers explicitly.
 
@@ -287,20 +306,22 @@ In 3 bullets, for a trader with less than 1 year of experience:
 
 ## Global Market Spillover
 
+(Index lines carry a `[±%]`, so each takes its ledger session tag — Asia/Europe indices are almost always `(prior close)`.)
+
 **Asia Session (closed/closing):**
-- **KOSPI**: [level] [±%] — [key theme]
-- **Nikkei 225**: [level] [±%] — [BOJ / yen / China-spillover note]
-- **Hang Seng**: [level] [±%] — [China stimulus / regulation / property]
-- **Shanghai Composite**: [level] [±%] — [theme]
+- **KOSPI**: [level] [±%] *([prior close])* — [key theme]
+- **Nikkei 225**: [level] [±%] *([prior close])* — [BOJ / yen / China-spillover note]
+- **Hang Seng**: [level] [±%] *([prior close])* — [China stimulus / regulation / property]
+- **Shanghai Composite**: [level] [±%] *([prior close])* — [theme]
 
 **Europe Session (mid-session):**
-- **DAX**: [level] [±%] — [driver]
-- **FTSE 100**: [level] [±%] — [driver]
-- **STOXX 600**: [level] [±%] — [driver]
+- **DAX**: [level] [±%] *([prior close])* — [driver]
+- **FTSE 100**: [level] [±%] *([prior close])* — [driver]
+- **STOXX 600**: [level] [±%] *([prior close])* — [driver]
 
 **USD/JPY:** [level] — [one sentence on yen carry-trade unwind risk if JPY strengthening sharply, else "stable, no carry-trade concern"]
 **DXY:** [level] — [direction vs prior US close, one sentence]
-**US10Y:** [level/%] — [direction vs prior US close, one sentence]
+**US10Y:** [level] [±% if quoted] *([prior close] if a % is shown)* — [direction vs prior US close, one sentence]
 
 **Notable overnight catalysts:** [Geopolitical events, central bank decisions, macro surprises from non-US markets. "None notable" is a fine answer.]
 

@@ -10,52 +10,62 @@ The bot-walled, JS-heavy structured sources return **403/Cloudflare to WebFetch*
 
 | Source | Path | Note |
 |--------|------|------|
-| `cnbc.com` (pre-markets, quotes) | **browser-primary** | WebFetch 403s; the Step 3a dashboard |
+| `quote.cnbc.com/quote-html-webservice` (structured JSON) | **scripted** (`fetch_market_data.py`) | the price/tape source — every number in the briefing |
+| `cnbc.com` (markets pages) | **browser-primary** | WebFetch 403s; news/themes (Step 3b) + manual last-resort for numbers |
 | `reuters.com/markets/us` | **browser-primary** | bot wall |
 | `investing.com` (calendar, indices, FX, earnings) | **browser-primary** | Cloudflare challenge |
 | `forexfactory.com/calendar` | **browser-primary** | Cloudflare challenge |
-| `finviz.com` (news, quote, groups, calendar) | WebFetch-first, browser fallback | quote.ashx stays the per-ticker price anchor |
+| `finviz.com` (news, groups, calendar) | WebFetch-first, browser fallback | headlines / analyst actions / earnings dates ONLY — **its quote.ashx price is the prior session's close, never the printed number** |
 | `marketwatch.com` | WebFetch-first, browser fallback | occasional paywall |
 
-Don't waste a WebFetch round-trip on a known browser-primary source — go straight to the browser.
+Don't waste a WebFetch round-trip on a known browser-primary source — go straight to the browser. **Numbers never come from a read page** — they come from the scripted CNBC ledger (Step 3a). WebSearch snippets are never a printed price.
 
 ---
 
-## Step 3a — Market Tape (browser)
+## Step 3a — Market Tape + Price Ledger (scripted)
 
-One browser load of CNBC's pre-markets page yields almost every structured number the briefing needs — futures + implied open, VIX/VXN, sector performance, commodities, Treasury yields, FX, and Asia/Europe indices — so pull it **once, first**, and harvest the rest from the saved snapshot.
+**Every number in the briefing comes from one scripted CNBC fetch — never a read page.** `scripts/fetch_market_data.py` calls CNBC's structured `quote.htm` JSON endpoint for the whole tape **and** every watchlist ticker in a single batched request, and writes a machine ledger sidecar (`.quote-ledger.json`) plus a printed markdown ledger. Run it once, first.
 
-**Capture recipe (the raw page must never enter context):**
-
-1. `browser_navigate https://www.cnbc.com/markets/pre-markets/` — writes the full snapshot to `.playwright-mcp/page-*.yml` on disk; returns only a tiny confirmation.
-2. `grep` the saved file for the data rows. The numbers live in `row "<LABEL> <value> <chg> <%chg>"` lines, plus the per-index futures table blocks. Useful greps:
-   - Commodities / vol / yields / FX / global:
-     `grep -oE 'row "[^"]+"' <file> | grep -E 'GOLD|SILVER|OIL|NAT GAS|RBOB|VIX|VXN|US 10-YR|US 2-YR|US 30-YR|EUR/USD|USD/JPY|GBP/USD|NIKKEI|HSI|SHANGHAI|DAX|FTSE|STOXX|FINANCIALS|TECHNOLOGY|ENERGY'`
-   - Futures + implied open: read the `Dow (mini)` / `S&P 500 (Mini)` / `NASDAQ (Mini)` blocks by line range — each carries an `IND Close / Future / Change` row and a `FAIR VALUE FUTURES` → `Impl Open` row.
-3. **Never call `browser_snapshot` without a `filename`** — it returns the ~100k-char page into context. The navigate already saved the file; grep that.
-
-**Build the Tape Table** (internal scratch, like the date-anchor and price-anchor tables; does not appear in the briefing). It is the **anchor** for every tape number — no futures %, VIX/VXN level, sector %, or commodity price reaches the body unless that exact figure is in the grep output.
+**Run it** (resolve the skill symlink to the real repo root, then):
 
 ```
-Tape table (CNBC pre-markets, grepped HH:MM MYT):
-  Futures:    ES <fut> (±%)  · NQ <fut> (±%)  · Dow <fut> (±%)  [implied-open Δ]
+python3 <skill-dir>/scripts/fetch_market_data.py <watchlist symbols> \
+  --out <repo-root>/data/trade-journal/daily/<US-date>/.quote-ledger.json
+```
+
+- Tape symbols are built in (`TAPE_SYMBOLS` in the script) — you pass only the watchlist tickers.
+- The `--out` sidecar path **must** sit next to the `premarket.md` you'll write — the validator and the PostToolUse hook find it by that exact sibling path.
+- The script prints a markdown table, one row per symbol: `symbol · prior_close · last · chg_pct · timestamp · source · quote_type`. **Consume it verbatim.**
+
+**The endpoint** (verified working; for reference / manual debugging):
+`GET https://quote.cnbc.com/quote-html-webservice/quote.htm?symbols=<PIPE_LIST>&requestMethod=itv&exthrs=1&output=json` → `{"ITVQuoteResult":{"ITVQuote":[…]}}`. No auth. Each quote carries `symbol`, `previous_day_closing`, `last`, `change_pct`, `curmktstatus`, and an `ExtendedMktQuote` block (`type:"PRE_MKT"`, `last`, `change_pct`, `last_time`) when a pre-market print exists.
+
+**`quote_type` is the determinism contract** — each row is exactly one of:
+- `PRE-MKT` — live pre-market print; today's move; tag `(pre-mkt)`.
+- `PRIOR-CLOSE` — no pre-market print; last completed session's close; tag `(prior close)`; **not** today's move.
+- `N/A` — no usable number for that exact symbol; tag `(N/A — reason)`; never a guess.
+
+The script **echo-verifies symbols** — a requested ticker CNBC doesn't return, or returns under a different share class (GOOG for GOOGL), is forced to `N/A`, never silently swapped.
+
+**Build the Tape Table** (internal scratch; does not appear in the briefing) by reading the tape rows out of the printed ledger. It is the **anchor** for every tape number — no futures %, VIX/VXN level, sector %, or commodity price reaches the body unless it's a non-`N/A` ledger row.
+
+```
+Tape table (CNBC ledger, fetched HH:MM MYT):
+  Futures:    ES <fut> (±%)  · NQ <fut> (±%)  · Dow <fut> (±%)
   Volatility: VIX <lvl> (±%) · VXN <lvl> (±%)
-  Sectors:    <leader> +x% … <laggard> −y%
+  Sectors:    <leader> +x% … <laggard> −y%   (from the XL* sector-ETF rows)
   Commodities:WTI <lvl> · Gold <lvl> · NatGas <lvl>
-  Yields/FX:  US10Y <%> · DXY <dir> · EUR/USD <lvl> · USD/JPY <lvl>
-  Global:     Nikkei <±%> · HSI <±%> · DAX <±%> · FTSE <±%> · STOXX <±%>
+  Yields/FX:  US10Y <%> · EUR/USD <lvl> · USD/JPY <lvl>
+  Global:     Nikkei <±%> · HSI <±%> · Shanghai <±%> · KOSPI <±%> · DAX <±%> · FTSE <±%> · STOXX <±%>
 ```
 
 **VIX classification** (for the Volatility line's tag): `<15 calm · 15–20 normal · 20–25 elevated · >25 high`. Report VXN's level alongside — it runs a few points higher than VIX; use VIX for the tag.
 
-**On a missing row** (page layout changed, module didn't load, navigation blocked): write the field as **`N/A — <one-clause reason>`**. Never guess, never substitute directional prose for a tape number.
+**On a missing row** (ledger row came back `N/A`): write the field as **`N/A — <one-clause reason>`**. Never guess, never substitute directional prose for a tape number.
 
-**What Step 3a feeds:** the four section-1.1 tape lines; the 1.1 dollar/yields **regime read** (US10Y direction, DXY when present); and most of **Global Market Spillover** (Asia/Europe indices, FX, USD/JPY). When the tape pull succeeds, route those from the Tape Table instead of running separate WebSearches.
+**What Step 3a feeds:** the four section-1.1 tape lines; the 1.1 dollar/yields **regime read** (US10Y direction; DXY when present); and most of **Global Market Spillover** (Asia/Europe indices, FX, USD/JPY). Route those from the ledger instead of running separate WebSearches.
 
-**Fallback (only if the CNBC load fails entirely):**
-- Per-source browser fetches / WebSearches listed under Step 3c and Global Spillover below.
-- DXY/US10Y direction: CNBC `/quotes/.DXY` and `/quotes/US10Y` (browser), or investing.com.
-- Say in the affected lines that the tape pull failed and the number is from a fallback (or `N/A — reason`).
+**Manual last-resort (numbers only):** if the script fails entirely (network down, endpoint changed), the browser CNBC pages are the documented fallback for tape numbers — `browser_navigate https://www.cnbc.com/markets/pre-markets/`, then `grep` the saved `.playwright-mcp/page-*.yml` (never `browser_snapshot` without a `filename` — it dumps ~100k chars into context). Say in the affected lines that the tape pull failed and the number is from a manual fallback (or `N/A — reason`). The browser pages remain the **primary** source for news/themes in Step 3b regardless.
 
 ---
 
@@ -99,7 +109,7 @@ Rules:
 - **One item can feed multiple sections** — list all of them in the "Feeds" column.
 - **"Seen in" with 2+ sources = corroborated** — weight it higher in 1.1 and 1.3. A theme only one source mentions is weighted lower.
 - **If an item names a watchlist ticker, record it** in the last column — that routes the story to Section 1.4. You have the watchlist in context from Step 2, so flag mentions as you read. This is additive to 1.4's full per-ticker scan; it does not replace it.
-- **Numbers in the inventory are directional context only.** A homepage may show "AVGO +6%" — do not copy that figure into the briefing body. Every `$price` and `±%` in the body must come from the Step 3.5 price-anchor table via a live finviz fetch. The inventory captures the *story*; the anchor table captures the *number*.
+- **Numbers in the inventory are directional context only.** A homepage may show "AVGO +6%" — do not copy that figure into the briefing body. Every `$price` and `±%` in the body must come from the **Step 3a CNBC ledger**. The inventory captures the *story*; the ledger captures the *number*.
 
 Once the inventory is built, compose sections 1.1, 1.3, and Market News & Catalysts by routing from it.
 
@@ -136,7 +146,7 @@ If the heatmap shows a notable mover with no story in the catalyst inventory, ru
 Section 1.4 is fed by **three nets**. A ticker reaches the 1.4 output if **any one** of them flags it:
 
 1. **Step 3b harvest** — any watchlist ticker flagged in the catalyst inventory. Catches a CNBC / MarketWatch / Reuters front-page story finviz's quote page never lists.
-2. **finviz per-ticker sweep** — `WebFetch https://finviz.com/quote.ashx?t=[TICKER]` for every watchlist ticker. One page gives recent headlines, analyst actions, earnings dates, pre-market % move, and key levels. This is the systematic full-watchlist scan **and** the Step 3.5 price-anchor pull.
+2. **finviz per-ticker sweep** — `WebFetch https://finviz.com/quote.ashx?t=[TICKER]` for every watchlist ticker, for **recent headlines, analyst actions, and earnings dates only**. This is the systematic full-watchlist *news* scan. **Do not read its price** — finviz's free quote is the prior session's close; the price anchor is the Step 3a CNBC ledger.
 3. **Supplemental per-ticker WebSearch** — for any ticker flagged with news by net 1 or net 2:
    - `WebSearch "[TICKER] stock news [DATE]"`
    - `WebSearch "[TICKER] pre-market [DATE]"` for tickers showing notable pre-market movement
@@ -144,11 +154,11 @@ Section 1.4 is fed by **three nets**. A ticker reaches the 1.4 output if **any o
 
    WebSearch is source-agnostic — it surfaces CNBC, Reuters, Bloomberg, etc., not just finviz.
 
-**finviz is the systematic sweep and the price anchor — it is NOT the sole gate on whether a ticker has news.** Don't waste a deep WebSearch on a quiet ticker: if a ticker shows no recent news in any net and no notable pre-market move, it's quiet — drop it from the output and move on.
+**finviz is the systematic *news* sweep — it is NOT the sole gate on whether a ticker has news, and NOT a price source.** Don't waste a deep WebSearch on a quiet ticker: if a ticker shows no recent news in any net and no notable pre-market move in the ledger, it's quiet — drop it from the output and move on.
 
 **Section 1.4 reports only watchlist tickers with news or a catalyst**, grouped by the watchlist's theme sections. Quiet tickers are dropped — no "Quiet today." lines. You still scan every ticker; the filter is on the output, not the scan.
 
-**Anchor table is mandatory for any ticker you'll quote with a number** — see Step 3.5 in `SKILL.md`. The finviz fetch in net 2 IS the anchor pull for that ticker; record prior close, current/pre-market price, and Δ% in the anchor table before writing the number anywhere in the body. Do not propagate the same price across sections from prose — re-check the anchor table at every mention.
+**The price anchor for any ticker you'll quote with a number is the Step 3a CNBC ledger** — see Step 3.5 in `SKILL.md`. Every per-ticker number is a ledger row already written by the script; pass each number through the three gates (pre-market / symbol-class / provenance) before it reaches the body. Do not propagate the same price across sections from prose — re-check the ledger row at every mention.
 
 ### Earnings Reports (inside "Market News & Catalysts")
 
