@@ -82,6 +82,42 @@ def test_validator_group_tag_scopes_bullet():
     md = "- Semis **(pre-mkt)**: NVDA +0.51% ($208.47), and others.\n"
     assert v.validate(md, LEDGER) == []
 
+# --- hardening against real-briefing non-quote $ figures (multi-ticker lines,
+# --- EPS, deal sizes, fund flows, price targets). See validate_quote_ledger docstring.
+LEDGER2 = [
+    {"symbol": "AVGO", "last": 376.71, "chg_pct": -4.37, "quote_type": "PRIOR-CLOSE"},
+    {"symbol": "MRVL", "last": 278.67, "chg_pct": -9.78, "quote_type": "PRIOR-CLOSE"},
+    {"symbol": "LRCX", "last": 369.34, "chg_pct": -5.03, "quote_type": "PRIOR-CLOSE"},
+    {"symbol": "QCOM", "last": 214.07, "chg_pct": -3.05, "quote_type": "PRIOR-CLOSE"},
+    {"symbol": "TSLA", "last": 402.07, "chg_pct": -0.64, "quote_type": "PRE-MKT"},
+    {"symbol": "AMD",  "last": 520.85, "chg_pct": 2.67,  "quote_type": "PRE-MKT"},
+]
+
+def test_validator_multiticker_shared_tag_line_passes():
+    # Real pattern: several bolded tickers, each with its own price, one shared tag.
+    v = _load_vql()
+    md = ("- **AVGO** ($376.71) , **MRVL** ($278.67) , **LRCX** ($369.34) , "
+          "**QCOM** ($214.07) *(prior close)* — group bounce.\n")
+    assert v.validate(md, LEDGER2) == []
+
+def test_validator_ignores_eps_dollar_figure():
+    # EPS is a $ figure wildly outside the price band — not a quote, no tag needed.
+    v = _load_vql()
+    md = "- **AMD** beat with EPS $2.10 vs $1.95 estimate.\n"
+    assert v.validate(md, LEDGER2) == []
+
+def test_validator_ignores_deal_size_and_fund_flow():
+    # Magnitude-suffixed amounts ($60B, ~$444M) are never quotes.
+    v = _load_vql()
+    md = "- **TSLA** ($402.07) *(pre-mkt)* — ARK shifted ~$444M into a $60B deal.\n"
+    assert v.validate(md, LEDGER2) == []
+
+def test_validator_still_catches_fabricated_price_on_clean_line():
+    # The incident class: a near-but-wrong price on a clean ticker quote line.
+    v = _load_vql()
+    md = "- **TSLA** +1.0% ($419.00) *(pre-mkt)* — fabricated gap.\n"
+    assert any("TSLA" in e and "419" in e for e in v.validate(md, LEDGER2))
+
 
 import subprocess
 
