@@ -11,6 +11,8 @@ Checks a generated premarket.md file against the skill's structural contract:
      Commodities). A line reading "N/A — reason" counts as present.
   7. Section 1.2 has impact labels OR the "Light calendar today" fallback
   8. Global Spillover lists all required Asia/Europe indices + USD/JPY
+  9. Global Spillover closes with a → US Spillover Read block (a **Net:** line,
+     or the 'no material spillover' benign-tape fallback)
 
 Exit code 0 if all pass, 1 otherwise.
 
@@ -226,6 +228,7 @@ def run_all_checks(briefing_path: Path) -> list[CheckResult]:
         *check_tape_lines(sections),
         check_econ_calendar(sections),
         check_global_spillover(sections),
+        check_spillover_read(sections),
     ]
 
 
