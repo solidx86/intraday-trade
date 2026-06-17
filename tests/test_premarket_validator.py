@@ -82,3 +82,54 @@ def test_run_all_checks_wires_in_regime_read():
     )
     results = validate_briefing.run_all_checks(sample)
     assert "regime_read" in {r.name for r in results}
+
+
+# --- Tape lines (browser-sourced market tape) -----------------------------
+
+TAPE_BODY = (
+    "**Futures (implied open):** ES +0.4% · NQ +0.7% · Dow +0.2%\n\n"
+    "**Volatility:** VIX 13.9 (−3.1%) · VXN 18.6 — **calm**\n\n"
+    "**Sector tape:** Technology +1.3% lead · Staples −0.2% lag\n\n"
+    "**Commodities:** WTI $68.4 · Gold $3,402 · NatGas $3.88\n\n"
+    "**Market mood:** **RISK-ON** — semis leading.\n"
+)
+
+TAPE_CHECK_NAMES = ["futures_line", "volatility_line", "sector_tape_line", "commodities_line"]
+
+
+def test_tape_lines_all_pass_when_present():
+    results = validate_briefing.check_tape_lines({SECTION_1_1: TAPE_BODY})
+    assert {r.name for r in results} == set(TAPE_CHECK_NAMES)
+    assert all(r.passed for r in results), [r.detail for r in results if not r.passed]
+
+
+@pytest.mark.parametrize(
+    "label",
+    ["**Futures (implied open):**", "**Volatility:**", "**Sector tape:**", "**Commodities:**"],
+)
+def test_each_tape_line_check_bites_when_its_line_is_missing(label):
+    body = "\n".join(line for line in TAPE_BODY.splitlines() if label not in line)
+    results = validate_briefing.check_tape_lines({SECTION_1_1: body})
+    assert any(not r.passed for r in results), "removing a tape line should fail a check"
+
+
+def test_tape_line_accepts_na_with_reason():
+    # The N/A-+-reason form satisfies the check: the field showed up honestly.
+    body = (
+        "**Futures (implied open):** ES +0.4% · NQ +0.7% · Dow +0.2%\n\n"
+        "**Volatility:** N/A — CNBC vol module didn't load this run\n\n"
+        "**Sector tape:** Technology +1.3% lead · Staples −0.2% lag\n\n"
+        "**Commodities:** WTI $68.4 · Gold $3,402 · NatGas $3.88\n"
+    )
+    results = validate_briefing.check_tape_lines({SECTION_1_1: body})
+    assert all(r.passed for r in results), [r.detail for r in results if not r.passed]
+
+
+def test_run_all_checks_wires_in_tape_lines():
+    from journal_schema import journal_trees, premarket_files
+
+    sample = next(
+        f for tree in journal_trees() for f in premarket_files(tree)
+    )
+    results = validate_briefing.run_all_checks(sample)
+    assert set(TAPE_CHECK_NAMES) <= {r.name for r in results}

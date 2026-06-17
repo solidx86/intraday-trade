@@ -14,6 +14,11 @@ briefing time, not a forecast of the post-open trend.
 *prior-close → now* pair. Never infer direction from "the catalyst says the dollar
 should be up." If the pair can't be fetched, write `NEUTRAL` and say the read is unconfirmed.
 
+**Sourcing:** US10Y (and DXY when present) come from the Step 3a market-tape pull
+(`SKILL.md`) — read direction off the Tape Table. If the tape missed a leg,
+fetch it from CNBC `/quotes/.DXY` / `/quotes/US10Y` (browser) or investing.com before
+falling back to `NEUTRAL`.
+
 ## The four regimes
 
 | DXY | US10Y | Regime | Meaning | `DXY → QQQ` inverse |

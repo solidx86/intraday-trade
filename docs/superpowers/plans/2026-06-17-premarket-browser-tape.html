@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan — Browser-Sourced Market Tape for the Pre-Market Briefing</title>
+<style>
+  :root { --ink:#1a1f29; --muted:#5c6675; --line:#e2e6ec; --bg:#fbfcfd; --accent:#1f6feb;
+    --good-bg:#eaf6ec; --good-bd:#a9d8b3; --code-bg:#f4f6f8; --warn-bg:#fff4e5; --warn-bd:#f0c27a; }
+  * { box-sizing:border-box; }
+  body { font:16px/1.62 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink); background:var(--bg); margin:0; padding:0; }
+  .wrap { max-width:860px; margin:0 auto; padding:48px 28px 96px; }
+  h1 { font-size:30px; line-height:1.2; margin:0 0 6px; letter-spacing:-0.01em; }
+  h2 { font-size:21px; margin:40px 0 12px; padding-bottom:6px; border-bottom:2px solid var(--line); }
+  h3 { font-size:16px; margin:24px 0 6px; }
+  .meta { color:var(--muted); font-size:14px; margin:0 0 8px; }
+  .status { display:inline-block; background:var(--good-bg); border:1px solid var(--good-bd);
+    color:#1e6b38; font-size:13px; font-weight:600; padding:3px 10px; border-radius:999px; }
+  code { background:var(--code-bg); padding:1.5px 5px; border-radius:4px; font-size:13.5px;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace; }
+  pre { background:var(--code-bg); border:1px solid var(--line); border-radius:8px; padding:14px 16px;
+    overflow-x:auto; font-size:13px; line-height:1.5; font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace; }
+  ul { padding-left:22px; } li { margin:4px 0; }
+  .files li { font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace; font-size:13.5px; }
+  .tag { font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.04em; }
+  .done::before { content:"✓ "; color:#1e8a4c; font-weight:700; }
+  .callout { border-radius:8px; padding:12px 16px; margin:16px 0; font-size:14.5px; }
+  .good { background:var(--good-bg); border:1px solid var(--good-bd); }
+  hr { border:none; border-top:1px solid var(--line); margin:36px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Browser-Sourced Market Tape — Implementation Plan</h1>
+  <p class="meta"><strong>Date:</strong> 2026-06-17 &nbsp;·&nbsp; <strong>Skill:</strong> <code>premarket-briefing-skill</code> &nbsp;·&nbsp; <strong>Branch:</strong> <code>feat/premarket-browser-tape</code></p>
+  <p><span class="status">Implemented — 142 tests green, validator 11/11</span></p>
+  <p class="meta">Review companion to the execution source of truth: <code>docs/superpowers/plans/2026-06-17-premarket-browser-tape.md</code> · Spec: <code>docs/superpowers/specs/2026-06-17-premarket-browser-tape-design.html</code></p>
+
+  <h2>Goal &amp; architecture</h2>
+  <p>Wire the Playwright headless browser in as the primary path for the bot-walled structured sources,
+  consolidated through one CNBC pre-markets "tape" load. Add four enforced 1.1 tape lines (Futures,
+  Volatility, Sector tape, Commodities); unify the <code>N/A — reason</code> failure rule across tape
+  numbers and per-ticker prices; keep the 7-section structure intact.</p>
+  <p>A new <strong>Step 3a</strong> runs first: <code>browser_navigate</code> → grep the saved snapshot
+  → build a Tape Table that anchors every tape number. The four 1.1 lines, the regime read's US10Y
+  direction, and most of Global Spillover route from it.</p>
+
+  <div class="callout good"><span class="tag">Token discipline</span><br>
+    The capture recipe greps the saved <code>.playwright-mcp/page-*.yml</code> for ~15 rows — the
+    ~100k-char page never enters context. <code>browser_snapshot</code> without a <code>filename</code>
+    is forbidden.</div>
+
+  <h2>Tasks (all complete)</h2>
+
+  <h3>Task 1 — Step 3a in SKILL.md</h3>
+  <ul>
+    <li class="done">Restructure Step 3 to three sub-steps; document 3a → 3b → 3c order.</li>
+    <li class="done">Add Step 3a — capture recipe, Tape Table, anchor rule, <code>N/A — reason</code> miss rule.</li>
+    <li class="done">Rename old 3a/3b → 3b/3c; source US10Y/DXY from the Tape Table.</li>
+  </ul>
+
+  <h3>Task 2 — Four 1.1 tape lines + unified N/A rule</h3>
+  <ul>
+    <li class="done">Insert the four bold tape lines; extend the blank-line note; add Tape-Table/VIX-scale note.</li>
+    <li class="done">Rewrite Step 3.5's ticker-price miss rule to <code>N/A — reason</code>; update the final self-check.</li>
+    <li class="done">Step 4 fills the four lines from the Tape Table before the regime call.</li>
+  </ul>
+
+  <h3>Task 3 — data-sources.md</h3>
+  <ul>
+    <li class="done">Step 3a section + browser-vs-WebFetch tiering table.</li>
+    <li class="done">Mark CNBC/Reuters/investing.com/forexfactory browser-primary; "Step 3a first" notes on Spillover.</li>
+    <li class="done">Graceful-degradation rewrite (tier escalation + <code>N/A — reason</code>).</li>
+  </ul>
+
+  <h3>Task 4 — macro-regime-read.md</h3>
+  <ul><li class="done">Tape-sourcing note for US10Y/DXY.</li></ul>
+
+  <h3>Task 5 — Validator + bite-tests (commit-green with fixtures)</h3>
+  <ul>
+    <li class="done"><code>check_tape_lines</code> added and wired; docstring updated.</li>
+    <li class="done">Four tape lines added to both sample briefings.</li>
+    <li class="done">Bite-tests: all-present passes, removing any line fails, <code>N/A</code> passes, wiring asserted.</li>
+    <li class="done">142 tests green; validator 11/11 on both fixtures.</li>
+  </ul>
+
+  <h3>Task 6 — Eval rubric + README</h3>
+  <ul>
+    <li class="done">Tape-lines rubric assertion in <code>evals.json</code> (valid JSON).</li>
+    <li class="done">README data-flow node + tech-stack line updated.</li>
+  </ul>
+
+  <hr>
+
+  <h2>Example 1.1 output</h2>
+  <pre>**Futures (implied open):** ES +0.25% · NQ +0.46% · Dow +0.14% — firm into the open.
+**Volatility:** VIX 16.4 (+1.3%) · VXN 27.0 (+4.0%) — **elevated**
+**Sector tape:** Financials +1.5% lead · Tech −2.3% lag — defensive rotation.
+**Commodities:** WTI $76.1 · Gold $4,361 · NatGas $3.25</pre>
+
+  <h2>Files touched</h2>
+  <ul class="files">
+    <li>premarket-briefing-skill/SKILL.md</li>
+    <li>premarket-briefing-skill/references/data-sources.md</li>
+    <li>premarket-briefing-skill/references/macro-regime-read.md</li>
+    <li>premarket-briefing-skill/evals/validators/validate_briefing.py</li>
+    <li>premarket-briefing-skill/evals/evals.json</li>
+    <li>tests/test_premarket_validator.py</li>
+    <li>examples/sample-journal/daily/2026-04-06/premarket.md</li>
+    <li>examples/sample-journal/daily/2026-04-08/premarket.md</li>
+    <li>README.md</li>
+  </ul>
+
+  <h2>Out of scope (deferred)</h2>
+  <ul>
+    <li>Pre-market gappers/movers beyond the watchlist.</li>
+    <li>Index technical levels (prior-day high/low vs implied open).</li>
+  </ul>
+
+</div>
+</body>
+</html>

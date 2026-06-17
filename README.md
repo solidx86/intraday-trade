@@ -11,7 +11,7 @@ I trade US equities intraday from Malaysia. The work that actually compounds —
 ```mermaid
 flowchart LR
     subgraph "before the session"
-        PB["premarket-briefing\n(WebSearch + WebFetch)"]
+        PB["premarket-briefing\n(WebSearch + WebFetch + browser tape)"]
     end
     subgraph "after each trade"
         TM["intraday-trade-mentor\n(vision critique of chart screenshots)"]
@@ -72,7 +72,7 @@ Testing splits in two by design: CI validates **outputs** (deterministic, free, 
 
 ## Stack at a glance
 
-Claude Skills (markdown spec-driven agent design) · Claude vision (chart-screenshot critique) · WebSearch/WebFetch (live news harvest) · Python + pytest (validator harness) · GitHub Actions (CI).
+Claude Skills (markdown spec-driven agent design) · Claude vision (chart-screenshot critique) · WebSearch/WebFetch (live news harvest) · Playwright headless browser (bot-walled structured-data capture — CNBC tape, calendars) · Python + pytest (validator harness) · GitHub Actions (CI).
 
 ## Data files & provenance
 

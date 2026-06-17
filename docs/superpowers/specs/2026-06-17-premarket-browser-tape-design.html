@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design — Browser-Sourced Market Tape for the Pre-Market Briefing</title>
+<style>
+  :root {
+    --ink: #1a1f29; --muted: #5c6675; --line: #e2e6ec; --bg: #fbfcfd;
+    --accent: #1f6feb; --warn-bg: #fff4e5; --warn-bd: #f0c27a;
+    --good-bg: #eaf6ec; --good-bd: #a9d8b3; --code-bg: #f4f6f8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font: 16px/1.62 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink); background: var(--bg); margin: 0; padding: 0;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 48px 28px 96px; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 { font-size: 21px; margin: 44px 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--line); letter-spacing: -0.01em; }
+  h3 { font-size: 17px; margin: 28px 0 8px; }
+  p, li { color: var(--ink); }
+  .meta { color: var(--muted); font-size: 14px; margin: 0 0 8px; }
+  .status { display: inline-block; background: var(--good-bg); border: 1px solid var(--good-bd);
+    color: #1e6b38; font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+  code { background: var(--code-bg); padding: 1.5px 5px; border-radius: 4px; font-size: 13.5px;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px 16px; overflow-x: auto; font-size: 13px; line-height: 1.5;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14.5px; }
+  th, td { border: 1px solid var(--line); padding: 8px 11px; text-align: left; vertical-align: top; }
+  th { background: #f0f3f7; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .callout { border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 14.5px; }
+  .warn { background: var(--warn-bg); border: 1px solid var(--warn-bd); }
+  .good { background: var(--good-bg); border: 1px solid var(--good-bd); }
+  ul, ol { padding-left: 22px; }
+  li { margin: 4px 0; }
+  .files li { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 13.5px; }
+  hr { border: none; border-top: 1px solid var(--line); margin: 40px 0; }
+  .tag { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Browser-Sourced Market Tape for the Pre-Market Briefing</h1>
+  <p class="meta"><strong>Date:</strong> 2026-06-17 &nbsp;·&nbsp; <strong>Skill:</strong> <code>premarket-briefing-skill</code> &nbsp;·&nbsp; <strong>Branch:</strong> <code>feat/premarket-browser-tape</code></p>
+  <p><span class="status">Approved design — implemented</span></p>
+
+  <h2>Problem</h2>
+  <p>The briefing gathers data with <code>WebFetch</code> + <code>WebSearch</code>. The most valuable
+  <strong>structured-data</strong> sources are exactly the ones <code>WebFetch</code> can't reach:
+  <code>cnbc.com</code> returns <strong>403</strong>, and <code>reuters.com</code>,
+  <code>investing.com</code>, and <code>forexfactory.com</code> sit behind Cloudflare/bot walls.
+  As a result the economic calendar, earnings actuals, and Global Spillover silently degrade.</p>
+  <p>And, wearing the intraday-trader hat, the briefing has never carried the single most important
+  pre-bell numbers: <strong>index futures / implied open</strong>, the <strong>VIX/VXN volatility
+  regime</strong>, the <strong>sector rotation tape</strong>, and <strong>commodities</strong> — precisely
+  because that data was hard to fetch.</p>
+
+  <h2>The unlock</h2>
+  <p>The Playwright headless browser loads <code>cnbc.com/markets/pre-markets/</code> cleanly. One load
+  yields futures + fair-value implied open, all Treasury tenors, FX, commodities, VIX/VXN, sector
+  performance, and Asia/Europe indices — enough to fill four new trader lines <strong>and</strong> most
+  of Global Spillover <strong>and</strong> the dollar/yields regime read, from a single fetch.</p>
+  <div class="callout good"><span class="tag">Token discipline</span><br>
+    <code>browser_navigate</code> writes the full ~100k-char snapshot to a <code>.playwright-mcp/page-*.yml</code>
+    file and returns only a tiny confirmation. The recipe <strong>greps the saved file</strong> for the
+    ~15 data rows it needs — the raw page never enters context. Calling <code>browser_snapshot</code>
+    without a <code>filename</code> (which dumps the page into context) is explicitly forbidden.</div>
+
+  <h2>Goals</h2>
+  <ul>
+    <li>Wire the browser in as the <strong>primary</strong> path for the bot-walled structured sources,
+      consolidated through one CNBC "tape" dashboard load.</li>
+    <li>Add four <strong>enforced</strong> tape lines to section 1.1: Futures, Volatility, Sector tape, Commodities.</li>
+    <li>Keep the 7-section output structure otherwise intact — reliability + key additions, not a redesign.</li>
+    <li>Anti-fabrication: every tape number is a grepped figure or an explicit <code>N/A — reason</code>;
+      unify that rule with the existing per-ticker price discipline.</li>
+  </ul>
+
+  <h2>Design</h2>
+
+  <h3>1. New gather sub-step — Step 3a: market tape (browser)</h3>
+  <p>A new sub-step (<code>SKILL.md</code> Step 3a) that runs <strong>first</strong> among the gather
+  sub-steps. It navigates CNBC pre-markets, greps the saved snapshot, and builds a <strong>Tape Table</strong> —
+  a mandatory internal scratch artifact, sibling to the Step 1 date-anchor and Step 3.5 price-anchor
+  tables. The Tape Table is the <strong>anchor</strong> for every tape number: nothing reaches the body
+  unless its exact figure is in the grep output.</p>
+  <p>The news harvest (Step 3b) and targeted lookups (Step 3c) follow. Execution order is
+  <strong>3a → 3b → 3c</strong>.</p>
+  <pre>Tape table (CNBC pre-markets, grepped HH:MM MYT):
+  Futures:    ES &lt;fut&gt; (±%)  · NQ &lt;fut&gt; (±%)  · Dow &lt;fut&gt; (±%)  [implied-open Δ]
+  Volatility: VIX &lt;lvl&gt; (±%) · VXN &lt;lvl&gt; (±%)
+  Sectors:    &lt;leader&gt; +x% … &lt;laggard&gt; −y%
+  Commodities:WTI &lt;lvl&gt; · Gold &lt;lvl&gt; · NatGas &lt;lvl&gt;
+  Yields/FX:  US10Y &lt;%&gt; · DXY &lt;dir&gt; · EUR/USD &lt;lvl&gt; · USD/JPY &lt;lvl&gt;
+  Global:     Nikkei &lt;±%&gt; · HSI &lt;±%&gt; · DAX &lt;±%&gt; · FTSE &lt;±%&gt; · STOXX &lt;±%&gt;</pre>
+
+  <h3>2. Four new section-1.1 tape lines</h3>
+  <p>Inserted between the three news bullets and the existing <code>Market mood</code> line:</p>
+  <pre>**Futures (implied open):** ES +0.25% · NQ +0.46% · Dow +0.14% — firm into the open.
+**Volatility:** VIX 16.4 (+1.3%) · VXN 27.0 (+4.0%) — **elevated**
+**Sector tape:** Financials +1.5% lead · Tech −2.3% lag — defensive rotation.
+**Commodities:** WTI $76.1 · Gold $4,361 · NatGas $3.25</pre>
+  <p>VIX tag scale: <code>&lt;15 calm · 15–20 normal · 20–25 elevated · &gt;25 high</code>. These lines
+  also feed the regime read (US10Y direction) and most of Global Spillover (Asia/Europe indices, FX) —
+  routed from the Tape Table instead of separate searches.</p>
+
+  <h3>3. Unified <code>N/A — reason</code> failure rule</h3>
+  <p>The tape fields are <strong>number-or-nothing</strong>: a real grepped figure, or
+  <code>N/A — &lt;one-clause reason&gt;</code> stating <em>why</em> (page layout changed, module didn't
+  load). No directional prose substitutes for a number. The same rule is applied to the existing
+  Step 3.5 per-ticker price discipline (replacing its old "write directional language only" instruction),
+  so the whole briefing fails the same honest, auditable way.</p>
+
+  <h3>4. Source tiering</h3>
+  <table>
+    <thead><tr><th>Source</th><th>Path</th></tr></thead>
+    <tbody>
+      <tr><td>CNBC, Reuters, investing.com, forexfactory</td><td><strong>browser-primary</strong> (skip the wasted WebFetch 403)</td></tr>
+      <tr><td>finviz (news, quote, groups, calendar)</td><td>WebFetch-first, browser fallback; <code>quote.ashx</code> stays the per-ticker price anchor</td></tr>
+      <tr><td>marketwatch.com</td><td>WebFetch-first, browser fallback</td></tr>
+    </tbody>
+  </table>
+  <p>Graceful degradation escalates by tier: WebFetch → browser → WebSearch → <code>N/A — reason</code>.</p>
+
+  <h3>5. Validator — four new checks</h3>
+  <ul>
+    <li><code>check_tape_lines</code> in <code>evals/validators/validate_briefing.py</code> verifies each
+      of the four bold tape labels is present in section 1.1.</li>
+    <li><strong><code>N/A — reason</code> satisfies the check</strong> — it asserts the field showed up
+      honestly, not that a number was found.</li>
+    <li>Wired into <code>run_all_checks</code> (now 11 checks); module docstring updated.</li>
+  </ul>
+
+  <h3>6. Tests (bite-style)</h3>
+  <p>New unit tests in <code>tests/test_premarket_validator.py</code> prove each tape check actually
+  bites: all-present passes; removing any one line fails its check; an <code>N/A — reason</code> line
+  passes; <code>run_all_checks</code> emits the four named results.</p>
+
+  <h3>7. Sample data + eval rubric</h3>
+  <p>Both tracked briefings gain the four tape lines in 1.1 (synthetic but plausible, consistent with
+  each day's narrative). One rubric criterion added to <code>evals.json</code>.</p>
+
+  <hr>
+
+  <h2>Decisions locked (ratified in design discussion)</h2>
+  <table>
+    <thead><tr><th>Decision</th><th>Choice</th></tr></thead>
+    <tbody>
+      <tr><td>Architecture</td><td>One consolidated CNBC "tape" load (Approach A), not per-source browser swaps</td></tr>
+      <tr><td>Context cost</td><td>Grep the saved snapshot; raw page never enters context</td></tr>
+      <tr><td>Tape fields</td><td>Number-or-<code>N/A — reason</code>; no directional substitute prose</td></tr>
+      <tr><td>Failure rule</td><td>Unified <code>N/A — reason</code> across tape numbers <em>and</em> per-ticker prices</td></tr>
+      <tr><td>New lines</td><td>Four: Futures, Volatility, Sector tape, Commodities</td></tr>
+      <tr><td>Durability</td><td>Validator-enforced (line-present; <code>N/A</code> counts as present)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Files touched</h2>
+  <ul class="files">
+    <li>premarket-briefing-skill/SKILL.md &nbsp;<span class="tag">Step 3a + 1.1 template + unified N/A rule</span></li>
+    <li>premarket-briefing-skill/references/data-sources.md &nbsp;<span class="tag">Step 3a section + tiering + degradation</span></li>
+    <li>premarket-briefing-skill/references/macro-regime-read.md &nbsp;<span class="tag">tape sourcing note</span></li>
+    <li>premarket-briefing-skill/evals/validators/validate_briefing.py &nbsp;<span class="tag">4 checks</span></li>
+    <li>premarket-briefing-skill/evals/evals.json &nbsp;<span class="tag">rubric line</span></li>
+    <li>tests/test_premarket_validator.py &nbsp;<span class="tag">bite tests</span></li>
+    <li>examples/sample-journal/daily/2026-04-06/premarket.md &nbsp;<span class="tag">data</span></li>
+    <li>examples/sample-journal/daily/2026-04-08/premarket.md &nbsp;<span class="tag">data</span></li>
+    <li>README.md &nbsp;<span class="tag">data-flow + tech stack</span></li>
+  </ul>
+
+  <h2>Out of scope (deferred)</h2>
+  <ul>
+    <li>Pre-market gappers/movers beyond the watchlist.</li>
+    <li>Index technical levels (prior-day high/low vs implied open).</li>
+    <li>Section order, numbering, and the other six sections — unchanged.</li>
+  </ul>
+
+  <h2>Verification</h2>
+  <ul>
+    <li><code>pytest -q</code> green — including the new bite tests.</li>
+    <li>Validator reports 11/11 on both sample briefings.</li>
+    <li>Manual end-to-end: one <code>browser_navigate</code> to CNBC, a grep (not a raw snapshot dump),
+      a populated Tape Table, and the four 1.1 lines with live numbers or honest <code>N/A — reason</code>.</li>
+    <li>Leak test: tape numbers are opaque market data — no methodology parameters introduced.</li>
+  </ul>
+
+</div>
+</body>
+</html>

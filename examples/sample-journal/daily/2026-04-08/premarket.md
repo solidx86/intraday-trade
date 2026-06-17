@@ -14,6 +14,11 @@ The 3 most important things happening in the market today:
 - **Energy unwinding Monday's OPEC+ shock.** Crude stabilized overnight after Tuesday's slide; XLE still the weakest sector on the week.
 - **Tech digesting Monday's run.** Semi leaders flat-to-down premarket after two strong sessions.
 
+**Futures (implied open):** ES −0.18% · NQ −0.31% · Dow −0.09% — soft into the open, everyone waiting on CPI.
+**Volatility:** VIX 18.7 (+4.2%) · VXN 24.1 (+5.0%) — **normal**, but bid up into the print.
+**Sector tape:** Utilities +0.4% lead · Energy −1.6% lag — defensive tilt; XLE still the week's weakest.
+**Commodities:** WTI $71.2 · Gold $3,388 · NatGas $4.11 — crude steadying after Monday's OPEC+ slide.
+
 **Market mood:** **MIXED, leaning RISK-OFF until CPI clears** — positioning is cautious; expect a fast, two-sided open.
 
 **Dollar/Yields regime:** **NEUTRAL** — DXY ↑ (prior close 104.05 → 104.20) + US10Y ↔ (4.34% → 4.35%). A tiny pre-CPI drift, both within noise; the cross-asset tape isn't confirming a regime.

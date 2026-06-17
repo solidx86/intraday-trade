@@ -64,19 +64,51 @@ Catching a date mistake at the anchor table costs seconds. Catching it after the
 
 Read `watchlist.md` in this skill's directory. Extract every ticker symbol (they're organized by theme — keep the theme groupings, section 1.4 reuses them as its sub-headers). The watchlist is the user's portfolio of stocks he tracks daily — scan every one, but section 1.4 reports only the tickers that have news or a catalyst (see section 1.4 for the rule).
 
-### Step 3 — Gather data (two phases)
+### Step 3 — Gather data (three sub-steps)
 
-Read `references/data-sources.md` for the source lists and the catalyst-inventory format. Gather data in two phases: a shared news harvest, then targeted lookups.
+Read `references/data-sources.md` for the source lists, the market-tape capture recipe, and the catalyst-inventory format. Gather data in three sub-steps, **in order** — the tape first (it's the macro backdrop the others read against), then the news harvest, then targeted lookups:
 
-#### Step 3a — Phase A: shared news harvest
+1. **Step 3a — market tape** (browser): the structured numbers — futures + implied open, volatility, sector rotation, commodities, Treasury yields, FX, and global indices — from one CNBC load.
+2. **Step 3b — shared news harvest**: the narrative pages.
+3. **Step 3c — targeted lookups**: the per-section structured sources (calendar, per-ticker prices, earnings).
 
-Fetch the four general-news pages once each (MarketWatch homepage, CNBC markets, Reuters US markets, finviz news). Read each one **broadly** — don't compose any output section yet.
+#### Step 3a — market tape (browser)
+
+The bot-walled structured sources (CNBC, Reuters, investing.com, forexfactory) return **403/Cloudflare to WebFetch** — fetch them with the headless browser instead. One `browser_navigate` to CNBC's pre-markets page yields almost every structured number the briefing needs, so pull it **once, first**, and harvest the rest from the saved snapshot.
+
+**Capture recipe (follow exactly — the raw page must never enter context):**
+
+1. `browser_navigate` to `https://www.cnbc.com/markets/pre-markets/`. This writes the full page snapshot to a `.playwright-mcp/page-*.yml` file on disk and returns only a tiny confirmation (page title + file path).
+2. **`grep` the saved snapshot file** for the data rows — never read the whole file. The numbers live in `row "<LABEL> <value> <chg> <%chg>"` lines plus the futures/implied-open table blocks. Example: `grep -oE 'row "[^"]+"' <file> | grep -E 'GOLD|OIL|NAT GAS|VIX|VXN|US 10-YR|EUR/USD|USD/JPY|NIKKEI|DAX|FTSE'`, and read the Dow/S&P/Nasdaq futures blocks by line range.
+3. **Never call `browser_snapshot` without a `filename`** — that returns the ~100k-char page into context and blows the token budget. The navigate already saved the file; grep that.
+
+See `references/data-sources.md` → "Step 3a — Market Tape" for the full grep patterns and the VIX classification scale.
+
+**Build the Tape Table** (a mandatory internal scratch artifact, sibling to the Step 1 date-anchor and Step 3.5 price-anchor tables — it does not appear in the briefing):
+
+```
+Tape table (CNBC pre-markets, grepped HH:MM MYT):
+  Futures:    ES <fut> (±%)  · NQ <fut> (±%)  · Dow <fut> (±%)  [implied-open Δ]
+  Volatility: VIX <lvl> (±%) · VXN <lvl> (±%)
+  Sectors:    <leader> +x% … <laggard> −y%
+  Commodities:WTI <lvl> · Gold <lvl> · NatGas <lvl>
+  Yields/FX:  US10Y <%> · DXY <dir> · EUR/USD <lvl> · USD/JPY <lvl>
+  Global:     Nikkei <±%> · HSI <±%> · DAX <±%> · FTSE <±%> · STOXX <±%>
+```
+
+**The Tape Table is the anchor for every tape number.** No futures %, VIX/VXN level, sector %, or commodity price may appear in the briefing body unless that exact figure is in the grepped Tape Table. If a row didn't come back from the grep (page layout changed, module didn't load, navigation blocked), the corresponding field is written **`N/A — <one-clause reason>`** — never a guessed number, never directional prose standing in for the number.
+
+Step 3a also feeds the section 1.1 dollar/yields **regime read** (US10Y direction; DXY direction when present) and most of **Global Market Spillover** (Asia/Europe indices, FX). When the tape pull succeeds, those don't need separate WebSearches — route them from the Tape Table. If the CNBC load fails entirely, fall back to the per-source browser fetches and WebSearches in `references/data-sources.md`, and say so in the affected lines.
+
+#### Step 3b — shared news harvest
+
+Fetch the four general-news pages once each (MarketWatch homepage, CNBC markets, Reuters US markets, finviz news) — use the per-source path in `references/data-sources.md` (CNBC and Reuters are **browser-primary**; MarketWatch and finviz are WebFetch). Read each one **broadly** — don't compose any output section yet.
 
 As you read, build the **catalyst inventory**: one row per distinct headline/mover, tagged with the section(s) it feeds and any watchlist ticker it names. The inventory is internal scratch (like the Step 1 date-anchor table) — it does not appear in the briefing. See `references/data-sources.md` for the row format and routing rules.
 
 This single harvest feeds three output sections: **1.1 General Market News**, **1.3 Stock & Industry Catalysts**, and **Market News & Catalysts**. Compose those sections by routing from the inventory.
 
-#### Step 3b — Phase B: targeted lookups
+#### Step 3c — targeted lookups
 
 For the structured-data sections, run the dedicated sources in `references/data-sources.md`:
 - **1.2 Economic Announcements Today** — forexfactory / investing.com calendar.
@@ -84,7 +116,7 @@ For the structured-data sections, run the dedicated sources in `references/data-
 - **1.4 Portfolio News** — finviz `quote.ashx` per ticker (this fetch is also the Step 3.5 price-anchor pull), plus supplemental per-ticker WebSearch for tickers with news.
 - **Earnings** — investing.com earnings calendar.
 - **Global Market Spillover** — the Asia/Europe index searches and USD/JPY.
-- **Dollar & yields regime read** — fetch **DXY** and **US10Y** as evidenced *prior-close → now* pairs (direction vs the prior US cash-session close, 16:00 ET). Direction is what the read needs; an exact level is optional. See `references/macro-regime-read.md`. Feeds the 1.1 regime line and the Global Spillover tape.
+- **Dollar & yields regime read** — **US10Y** (and **DXY** when present) come from the Step 3a Tape Table; only fetch them here if the tape pull missed them. Read both as evidenced *prior-close → now* pairs (direction vs the prior US cash-session close, 16:00 ET). Direction is what the read needs; an exact level is optional. See `references/macro-regime-read.md`. Feeds the 1.1 regime line and the Global Spillover tape.
 
 **Rules (both phases):**
 - **Always date-scope your searches.** Append the computed US trading date (e.g., `"stock market today May 15 2026"`) so you don't surface stale articles.
@@ -115,7 +147,7 @@ This step exists for the same reason as Step 1: when the model writes a specific
    ...
    ```
 
-3. **No specific price or % may appear in the briefing body unless that exact number appears in the anchor table.** If the finviz fetch didn't produce a usable number (page blocked, ambiguous, mid-session intraday data, etc.), write directional language only ("trading lower into the open", "bidding pre-market") and explicitly note *"specific quote unverified — finviz returned X"* in the line.
+3. **No specific price or % may appear in the briefing body unless that exact number appears in the anchor table.** If the finviz fetch didn't produce a usable number (page blocked, ambiguous, mid-session intraday data, etc.), write **`N/A — <one-clause reason>`** in place of the number (e.g., *"NVDA N/A — finviz returned mid-session data, no clean pre-market quote"*) — never a guessed figure, and never directional prose substituting for the number. This is the same `N/A — reason` rule the Step 3a tape lines use; failures are stated and explained, not softened.
 
 4. **The ticker driving the #1 recommendation in Quick Summary must be re-fetched in this step regardless of what you think you know.** This is the highest-blast-radius number in the briefing — a wrong NVDA pre-market % cascades into AMD, AVGO, the whole #1 trade thesis, and the "don't carry through earnings" warning. Pay the WebFetch cost for the headline name every single run.
 
@@ -127,13 +159,13 @@ This step exists for the same reason as Step 1: when the model writes a specific
 - **If a price "feels right" because the catalyst suggests it should be that direction, STOP.** Re-fetch finviz. The confabulation always wins when you trust the narrative more than the quote.
 - **Fix wrong prices by re-fetching, not by editing the wording.** The anchor table is the source of truth; the body must be made consistent with it, not the other way around.
 
-**Final self-check (before Step 5 save):** scan the completed briefing for every `$NNN.NN` and every `±N.N%`. For each, point at the row in the anchor table that justifies it. If you can't, replace the number with directional language and a "unverified" note, or delete the line entirely. **A briefing with one missing number is useful. A briefing with one fabricated number destroys the user's edge.**
+**Final self-check (before Step 5 save):** scan the completed briefing for every `$NNN.NN` and every `±N.N%`. For each, point at the row in the anchor table (ticker prices) or the Tape Table (futures, VIX/VXN, sectors, commodities) that justifies it. If you can't, replace the number with **`N/A — <reason>`**, or delete the line entirely. **A briefing with one missing number is useful. A briefing with one fabricated number destroys the user's edge.**
 
 ### Step 4 — Fill the template
 
 Use the exact template in the **Output template** section below. Preserve section order and heading text. The user has read this format many times — consistency matters more than creativity.
 
-Classify the dollar/yields regime per `references/macro-regime-read.md` and write the regime + alignment lines into section 1.1.
+Fill section 1.1's four tape lines (Futures, Volatility, Sector tape, Commodities) from the Step 3a Tape Table — real grepped numbers or `N/A — reason`. Then classify the dollar/yields regime per `references/macro-regime-read.md` and write the regime + alignment lines into section 1.1.
 
 ### Step 5 — Save and render
 
@@ -161,13 +193,20 @@ The 3 most important things happening in the market today:
 - **[Headline]** — [Why it matters]
 - **[Headline]** — [Why it matters]
 
+**Futures (implied open):** ES [±%] · NQ [±%] · Dow [±%] — [one clause: firm / soft / mixed into the open]
+**Volatility:** VIX [lvl] ([±%]) · VXN [lvl] ([±%]) — **[calm / normal / elevated / high]**
+**Sector tape:** [leader] [+x%] lead · [laggard] [−y%] lag — [one clause: where the rotation is]
+**Commodities:** WTI $[lvl] · Gold $[lvl] · NatGas $[lvl] — [one clause only if a move matters; else omit clause]
+
 **Market mood:** **RISK-ON** / **RISK-OFF** — [one sentence why]
 
 **Dollar/Yields regime:** **SCARED** / **GREEDY** / **GOLDILOCKS** / **NEUTRAL** — [one-clause rationale] ([DXY arrow + prior-close → now] + [US10Y arrow + prior-close → now])
 
 → [Alignment line. If mood and regime disagree, lead with **⚠️ MOOD/REGIME SPLIT** and fade/size-down guidance. If they agree, state the aligned posture — and in GREEDY/GOLDILOCKS fire the "don't short QQQ off a strong dollar" caveat. See references/macro-regime-read.md.]
 
-(Keep these three lines blank-line separated — without the blank lines markdown collapses them into one clumped paragraph.)
+(Keep every bold stat line above — the four tape lines plus Market mood, Dollar/Yields regime, and the → line — blank-line separated. Without the blank lines markdown collapses them into one clumped paragraph.)
+
+(The four tape lines come from the Step 3a Tape Table. Each field is a real grepped number or `N/A — <reason>` — never a guessed figure. VIX tag: <15 calm · 15–20 normal · 20–25 elevated · >25 high.)
 
 ---
 

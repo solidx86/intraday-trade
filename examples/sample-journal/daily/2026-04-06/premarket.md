@@ -14,6 +14,11 @@ The 3 most important things happening in the market today:
 - **Treasury yields easing.** The 10-year drifted lower overnight after soft survey data, taking pressure off long-duration tech.
 - **Quiet macro calendar.** No tier-1 prints today; tape likely driven by the earnings follow-through.
 
+**Futures (implied open):** ES +0.42% · NQ +0.74% · Dow +0.21% — firm into the open, semis leading the bid.
+**Volatility:** VIX 13.9 (−3.1%) · VXN 18.6 (−2.4%) — **calm**, no fear bid into the rally.
+**Sector tape:** Technology +1.3% lead · Staples −0.2% lag — money chasing the semi follow-through.
+**Commodities:** WTI $68.4 · Gold $3,402 · NatGas $3.88 — quiet; no commodity story driving the tape.
+
 **Market mood:** **RISK-ON** — earnings tailwind plus easing yields; semis leading, breadth supportive pre-open.
 
 **Dollar/Yields regime:** **GOLDILOCKS** — DXY ↓ (prior close 103.20 → 102.85) + US10Y ↓ (4.18% → 4.12%). Softer dollar with easing yields is a disinflation tailwind, not fear; risk-on is confirmed.
