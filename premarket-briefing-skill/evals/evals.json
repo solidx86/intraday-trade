@@ -30,6 +30,10 @@
           "type": "qualitative"
         },
         {
+          "text": "Section 1.1 carries the four market-tape lines — '**Futures (implied open):**', '**Volatility:**' (VIX/VXN with a calm/normal/elevated/high tag), '**Sector tape:**', and '**Commodities:**' — sourced from the Phase C browser tape pull. Each field is a real grepped number or an explicit 'N/A — <reason>'; never a guessed figure.",
+          "type": "structural"
+        },
+        {
           "text": "Section 1.2 either lists events with HIGH/MED/LOW impact labels, or states 'Light calendar today — no major data releases.'",
           "type": "structural"
         },
