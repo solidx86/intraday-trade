@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design — Deterministic Number Pipeline for the Pre-Market Briefing</title>
+<style>
+  :root {
+    --ink: #1a1f29; --muted: #5c6675; --line: #e2e6ec; --bg: #fbfcfd;
+    --accent: #1f6feb; --warn-bg: #fff4e5; --warn-bd: #f0c27a;
+    --good-bg: #eaf6ec; --good-bd: #a9d8b3; --bad-bg: #fdecea; --bad-bd: #f0b3ad;
+    --code-bg: #f4f6f8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font: 16px/1.62 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink); background: var(--bg); margin: 0; padding: 0;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 48px 28px 96px; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 { font-size: 21px; margin: 44px 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--line); letter-spacing: -0.01em; }
+  h3 { font-size: 17px; margin: 28px 0 8px; }
+  p, li { color: var(--ink); }
+  .meta { color: var(--muted); font-size: 14px; margin: 0 0 8px; }
+  .status { display: inline-block; background: var(--good-bg); border: 1px solid var(--good-bd);
+    color: #1e6b38; font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+  code { background: var(--code-bg); padding: 1.5px 5px; border-radius: 4px; font-size: 13.5px;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px 16px; overflow-x: auto; font-size: 13px; line-height: 1.5;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14.5px; }
+  th, td { border: 1px solid var(--line); padding: 8px 11px; text-align: left; vertical-align: top; }
+  th { background: #f0f3f7; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .callout { border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 14.5px; }
+  .warn { background: var(--warn-bg); border: 1px solid var(--warn-bd); }
+  .good { background: var(--good-bg); border: 1px solid var(--good-bd); }
+  .bad  { background: var(--bad-bg);  border: 1px solid var(--bad-bd); }
+  ul, ol { padding-left: 22px; }
+  li { margin: 4px 0; }
+  .files li { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 13.5px; }
+  .tag { display: inline-block; background: var(--accent); color: #fff; font-size: 11px; font-weight: 600;
+    padding: 2px 7px; border-radius: 4px; letter-spacing: 0.02em; text-transform: uppercase; }
+  .tag.warn-tag { background: #b9791f; } .tag.bad-tag { background: #c0392b; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Deterministic Number Pipeline for the Pre-Market Briefing</h1>
+  <p class="meta">Design spec · 2026-06-17 · skill: <code>premarket-briefing-skill</code> · scope: numbers only (news harvest unchanged)</p>
+  <p><span class="status">Draft — awaiting user review</span></p>
+
+  <p>Every dollar price and percent move in the briefing is presently produced by the model <em>reading</em> a
+  semi-structured quote page and transcribing what it sees. On 2026-06-17 that pipeline failed three ways in a
+  single run. This redesign removes the model's hands from the number pipeline: a script fetches numbers from a
+  structured JSON source, a validator gates the finished briefing against that machine output, and the model
+  only narrates.</p>
+
+  <h2>The defects (2026-06-17 incident)</h2>
+  <table>
+    <thead><tr><th>#</th><th>Defect</th><th>Root cause</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Tuesday's close-to-close moves printed as Wednesday "pre-market" (e.g. AAPL "+0.95%", GOOGL "+1.06%" were the prior session, not pre-market).</td><td>finviz <code>quote.ashx</code> free endpoint serves the <strong>last <em>completed</em> regular session's close</strong>, but Step 3.5 treats it as the live "current/pre-mkt" anchor.</td></tr>
+      <tr><td>2</td><td>No check that a quoted number was actually a pre-market tick versus a prior close.</td><td>The anchor table has a "Current/pre-mkt" column but nothing verifies the figure carries a pre-market timestamp/label.</td></tr>
+      <tr><td>3</td><td>A WebSearch snippet's number was printed, and it was the wrong share class — <code>GOOG</code> (Class C) used for <code>GOOGL</code> (Class A, the watchlist symbol).</td><td>No exact-symbol/share-class guard; no rule forbidding a search snippet from being the printed price.</td></tr>
+    </tbody>
+  </table>
+  <div class="callout warn"><strong>The principle being corrected.</strong> "Deterministic" cannot mean the
+  values are identical across runs — the market moves between fetches. It means the <strong>extraction,
+  labeling, and verification are mechanical (code), not model judgment</strong>, and the finished artifact is
+  validated against the machine output. The model can't invent a number at the source (script owns extraction)
+  <em>and</em> can't alter or fabricate one in the write-up (validator gates the saved file). Both, or the
+  guarantee leaks. Determinism guarantees faithful reproduction of the feed, not that the feed is correct.</div>
+
+  <h2>The unlock — endpoints verified on 2026-06-17</h2>
+  <p>Both candidate sources were probed live (stdlib <code>urllib</code>, with a User-Agent) before this spec
+  was written.</p>
+
+  <h3>CNBC <code>quote.htm</code> — PRIMARY (verified)</h3>
+  <p><code>https://quote.cnbc.com/quote-html-webservice/quote.htm?symbols=&lt;list&gt;&amp;requestMethod=itv&amp;exthrs=1&amp;output=json</code>
+  — <strong>no auth</strong>, batch multi-symbol, returns <code>ITVQuoteResult.ITVQuote[]</code>. Verified
+  return for <code>AAPL | .SPX | .VIX | @CL.1 | .GDAXI | .N225 | .KS11</code> (stock, index, vol, future,
+  European + Asian indices incl. KOSPI). Each quote carries <code>previous_day_closing</code>,
+  <code>last</code>, <code>change_pct</code>, <code>curmktstatus</code>, and — decisively — an
+  <code>ExtendedMktQuote</code> block:</p>
+  <pre>AAPL  previous_day_closing=299.24  curmktstatus=REG_MKT
+  ExtendedMktQuote: { type:"PRE_MKT", last:"300.92", change_pct:"+0.56%",
+                      last_timedate:"9:30 AM EDT", last_time:"2026-06-17T09:30:00-0400" }</pre>
+  <div class="callout good">CNBC hands us the three gate inputs as <strong>fields to read, not things to
+  infer</strong>: quote-type (<code>ExtendedMktQuote.type = PRE_MKT</code>), an ISO timestamp
+  (<code>last_time</code>), and the prior close (<code>previous_day_closing</code>) — in one no-auth batch
+  call, from the same data behind the four CNBC market pages the briefing already references.</div>
+
+  <h3>Yahoo v7 quote — CROSS-CHECK + FALLBACK (verified)</h3>
+  <p><code>query1.finance.yahoo.com/v7/finance/quote?symbols=&lt;list&gt;</code> returns 401 bare, but the
+  <strong>crumb+cookie flow runs in stdlib</strong> (seed cookie at <code>fc.yahoo.com</code> → crumb at
+  <code>/v1/test/getcrumb</code> → quote). Verified return incl. <code>ES=F, ^VIX, ^TNX, EURUSD=X, ^GDAXI,
+  ^KS11, XLK</code> with correct <code>regularMarketPreviousClose</code> (AAPL 299.24). Fields
+  <code>preMarketPrice / preMarketChangePercent / marketState</code> exist; they read <code>None / REGULAR</code>
+  only because the probe ran after the 09:30 ET open. v8-chart (no-auth) is a weak last-resort — no clean
+  pre-market or prior close.</p>
+  <div class="callout bad"><span class="tag bad-tag">Banned as a price</span> finviz <code>quote.ashx</code>
+  (free) — its price is the prior session's close. Demoted to headlines / analyst actions / earnings dates
+  only. A <strong>WebSearch snippet may never be a printed price/%</strong> (it can inform the story).</div>
+
+  <h2>Goals</h2>
+  <ul>
+    <li>Replace model-read numbers with a <strong>scripted fetch</strong> from CNBC's JSON (tape + per-ticker), Yahoo as cross-check/fallback.</li>
+    <li>Make quote-type (<code>PRE-MKT</code> / <code>PRIOR-CLOSE</code> / <code>N/A</code>), timestamp, and exact-symbol matching <strong>mechanical</strong>.</li>
+    <li>Add a <strong>validator</strong> that fails the briefing if any printed number can't be tied to the machine ledger.</li>
+    <li>Retire the browser as a <em>number</em> source (it stays for news/themes) — also eliminating the "snapshot didn't render" failure hit twice on 2026-06-17.</li>
+    <li>Keep the briefing's structure, voice, and 7 sections intact. This changes <em>how numbers arrive</em>, not the output format — beyond per-number session tags.</li>
+  </ul>
+
+  <h2>Design</h2>
+
+  <h3>1. Source reclassification</h3>
+  <table>
+    <thead><tr><th>Source</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td>CNBC <code>quote.htm</code> JSON</td><td><strong>Primary</strong> for every number — tape (futures, VIX/VXN, sectors, commodities, US yields, FX, all global indices) <em>and</em> per-ticker.</td></tr>
+      <tr><td>Yahoo v7 (+crumb)</td><td><strong>Cross-check</strong> on the headline name(s) + <strong>fallback</strong> when CNBC fails or a symbol doesn't resolve.</td></tr>
+      <tr><td>finviz <code>quote.ashx</code></td><td>Non-price only: headlines, analyst actions, earnings dates. Documented as "price = prior close, banned as the printed number."</td></tr>
+      <tr><td>Headless browser</td><td>News/theme prose (Step 3b) only; last-resort number fallback if both JSON sources fail.</td></tr>
+      <tr><td>WebSearch</td><td>Story/context only. <strong>Never</strong> a printed price/%.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2. The fetch script — <code>scripts/fetch_market_data.py</code> (new)</h3>
+  <p>Stdlib only (<code>urllib</code>, <code>json</code>, <code>http.cookiejar</code>,
+  <code>concurrent.futures</code>) so it runs under the PEP-668-locked system <code>python3</code> with no
+  <code>pip</code>. Invoked by the agent via one Bash call at Step 3.5; the agent consumes stdout verbatim and
+  never reads a price off a page.</p>
+  <ul>
+    <li><strong>Inputs:</strong> the per-ticker watchlist (read from <code>watchlist.md</code>) plus a fixed <strong>tape symbol map</strong> (CNBC symbology — e.g. <code>@ES.1 @NQ.1 @YM.1 .VIX .VXN US10Y @CL.1 @GC.1 @NG.1 EUR= JPY= .N225 .HSI .SSEC .KS11 .GDAXI .FTSE .STOXX50E</code>, sectors via index or SPDR ETF). The complete map is finalized at build time; any symbol that fails to resolve emits <code>N/A</code>, never a guess.</li>
+    <li><strong>Concurrency:</strong> batch request first (CNBC accepts a <code>|</code>-joined list in one call). If per-symbol requests are needed (fallback/Yahoo), a <code>ThreadPoolExecutor(max_workers≈8)</code> inside the script. Output is <strong>sorted by input order</strong> so the ledger is byte-identical regardless of completion order.</li>
+    <li><strong>Quote-type derivation (mechanical):</strong> <code>PRE-MKT</code> when <code>ExtendedMktQuote.type == "PRE_MKT"</code> with a today-dated <code>last_time</code>; else <code>PRIOR-CLOSE</code>; <code>N/A</code> on fetch failure or symbol-echo mismatch.</li>
+    <li><strong>Symbol/class gate:</strong> the response <code>symbol</code> must equal the requested symbol; a mismatch (e.g. <code>GOOG</code>≠<code>GOOGL</code>) → rejected to <code>N/A</code>.</li>
+    <li><strong>Cross-check:</strong> for the headline name(s), also fetch Yahoo and compare; disagreement beyond tolerance (&gt;0.3% or opposite sign) → flag/<code>N/A</code>.</li>
+    <li><strong>Outputs:</strong> a JSON sidecar <code>daily/&lt;US-date&gt;/.quote-ledger.json</code> (machine source of truth for the validator) and a human-readable markdown ledger to stdout (what the model pastes into scratch).</li>
+    <li><strong>Failure = N/A, never a guess.</strong> Broad outage → the briefing prints <code>N/A</code> and says so.</li>
+  </ul>
+
+  <h3>3. The unified ledger (replaces the hand-built anchor + tape tables)</h3>
+  <p>One row per number, tape and ticker alike:</p>
+  <pre>symbol(exact) | prior_close | last/pre_mkt | chg_pct | timestamp(ET) | source | quote_type</pre>
+  <p>Quote-type is one of <code>PRE-MKT</code> / <code>PRIOR-CLOSE</code> / <code>N/A</code>, set by the script.</p>
+
+  <h3>4. Three hard gates</h3>
+  <ol>
+    <li><strong>Pre-market gate:</strong> a number prints as "today's move" only if <code>quote_type == PRE-MKT</code> with a timestamp. A <code>PRIOR-CLOSE</code> figure is tagged <code>(prior close)</code> in the body or marked <code>N/A</code> — never dressed as today's move.</li>
+    <li><strong>Symbol/class gate:</strong> exact watchlist symbol, response-echo verified.</li>
+    <li><strong>Provenance gate:</strong> the printed number traces to the ledger (CNBC/Yahoo structured fetch), never a search snippet or model memory.</li>
+  </ol>
+
+  <h3>5. Output convention (template)</h3>
+  <p>Every per-ticker and tape number in the body carries a session tag: <code>(pre-mkt)</code> /
+  <code>(prior close)</code> / <code>(N/A — reason)</code> — the convention adopted by hand in the 2026-06-17
+  briefing. The reader always knows which session a number reflects.</p>
+  <p><strong>Grouped tags (readability + machine-checkable):</strong> one tag may scope a list of numbers within a
+  single bullet/line (e.g. "Semis bouncing <strong>(pre-mkt)</strong>: AMD +2.67%, MU +3.26%, NVDA +0.51%"). The
+  validator scopes a tag to its bullet — a group tag covers every number listed until the next tag — so grouping
+  stays parseable. Every number must fall under some tag; an untagged number fails validation.</p>
+
+  <h3>6. The validator — extend <code>evals/validators/validate_briefing.py</code></h3>
+  <p>Parses the saved <code>premarket.md</code>, extracts every <code>$price</code> and <code>±%</code> with its
+  ticker and session tag, and cross-checks against <code>.quote-ledger.json</code>. <strong>Fails</strong> when:</p>
+  <ul>
+    <li>a <code>(pre-mkt)</code>-tagged number has no <code>PRE-MKT</code> ledger row;</li>
+    <li>a printed value doesn't match the ledger (within rounding);</li>
+    <li>a ticker isn't in the watchlist / exact symbol;</li>
+    <li>a number carries no session tag.</li>
+  </ul>
+  <p><strong>Enforcement is two-layered:</strong></p>
+  <ul>
+    <li><strong>Step-5 self-check (first line):</strong> SKILL.md instructs the agent to run the validator after writing <code>premarket.md</code> and fix/<code>N/A</code> any flagged number before presenting. Keeps the common path clean.</li>
+    <li><strong>Hard hook (backstop — cannot be skipped):</strong> a <code>PostToolUse</code> hook in <code>.claude/settings.json</code>, matched to <code>Write</code>/<code>Edit</code> on <code>daily/*/premarket.md</code>, runs the validator automatically and returns a <strong>blocking decision on failure regardless of agent compliance</strong>. The hook reads the just-written file + the sibling <code>.quote-ledger.json</code>. Rule: <strong>no ledger present → block</strong> (forces the deterministic fetch path); a ledger present with all-<code>N/A</code> rows is allowed (an honest outage isn't an error). The hook early-exits silently for any non-premarket write, so it is inert for all other work — and for anyone cloning the public repo.</li>
+  </ul>
+  <p>The verdict is mechanical in both layers; the hook is what makes "every invocation" literally true. <strong>CI:</strong> <code>tests/test_quote_ledger.py</code> covers the validator logic <em>and</em> the hook's stdin/path wrapper (given a Write-event JSON → correct block/pass) against fixtures, so the suite stays offline (mirrors <code>tests/test_premarket_validator.py</code>). The <code>settings.json</code> registration is applied via the <code>update-config</code> mechanism.</p>
+
+  <h3>7. SKILL.md changes</h3>
+  <ul>
+    <li><strong>Step 3a (tape):</strong> rewritten — tape numbers come from the script, not browser-grep. Browser tape demoted to fallback.</li>
+    <li><strong>Step 3.5:</strong> rewritten around running the script and consuming the ledger; the three gates replace the prose anchor rules.</li>
+    <li><strong>Final self-check:</strong> adds "every number has a ledger row of the right quote-type; every symbol matches the watchlist; no number from a snippet."</li>
+    <li><strong>Incident note:</strong> a dated 2026-06-17 entry (finviz-prior-close + GOOG/GOOGL), mirroring the existing NVDA-confabulation note, so the rationale survives.</li>
+    <li><strong>Template:</strong> the <code>(pre-mkt)</code>/<code>(prior close)</code> tag convention.</li>
+  </ul>
+
+  <h3>8. <code>references/data-sources.md</code> changes</h3>
+  <ul>
+    <li>New CNBC JSON + Yahoo crumb endpoints documented as the structured price/tape source.</li>
+    <li>finviz reclassified to non-price; Section 1.4 "net 2" split (finviz = news/earnings sweep; CNBC/Yahoo = the price).</li>
+  </ul>
+
+  <h2>Testing</h2>
+  <ul>
+    <li><code>tests/test_quote_ledger.py</code> — validator logic against fixture briefing + fixture ledger (pass case; each fail case: untagged number, pre-mkt-without-row, value mismatch, unknown symbol).</li>
+    <li>The fetch script itself is exercised with a recorded-JSON fixture (parse → ledger), so the test suite stays offline/deterministic (no live network in CI).</li>
+    <li>Existing <code>tests/test_premarket*.py</code> reviewed for any finviz-as-price assumption.</li>
+  </ul>
+
+  <h2>Honest constraints &amp; risks</h2>
+  <ul>
+    <li><strong>Endpoint reliability:</strong> CNBC/Yahoo are unofficial JSON; either can change shape or rate-limit. Mitigation: dual source + <code>N/A</code> on failure + browser last-resort; the validator never blocks on missing data, only on <em>wrong</em> data.</li>
+    <li><strong>Symbol map drift:</strong> CNBC symbology for the tape must be enumerated and maintained; an unverified symbol degrades to <code>N/A</code> (loud), not a guess (silent).</li>
+    <li><strong>Pre-market vs open timing:</strong> if the skill runs after 09:30 ET the script returns <code>REG_MKT</code> last prints, correctly tagged <code>(prior close)</code>/regular — not mislabeled pre-market.</li>
+    <li><strong>Determinism scope:</strong> pipeline, not values (restated from the principle box).</li>
+  </ul>
+
+  <h2>Out of scope (decided)</h2>
+  <ul>
+    <li><strong>News via RSS.</strong> Yahoo per-symbol RSS and CNBC Top-News RSS were verified working, but news is prose the model summarizes (no number to hallucinate; the validator doesn't gate it). The browser news harvest (Step 3b) is <strong>unchanged</strong>. Not pursued.</li>
+    <li>No change to the briefing's sections, voice, regime read, or spillover logic.</li>
+  </ul>
+
+  <h2>Decision log</h2>
+  <table>
+    <thead><tr><th>Question</th><th>Decision</th></tr></thead>
+    <tbody>
+      <tr><td>Fix depth</td><td>Full Step 3.5 redesign</td></tr>
+      <tr><td>Determinism mechanism</td><td>Scripted fetch + scripted validate</td></tr>
+      <tr><td>Primary price source</td><td>CNBC <code>quote.htm</code> JSON (after verifying both); Yahoo cross-check/fallback</td></tr>
+      <tr><td>Tape coverage</td><td>Full (tape + per-ticker), gated on endpoint verification — now cleared</td></tr>
+      <tr><td>Concurrency</td><td>Inside the script (batch-first, threadpool fallback); not agent/subagent fan-out</td></tr>
+      <tr><td>News</td><td>Numbers only — browser news harvest unchanged</td></tr>
+      <tr><td>Runtime enforcement</td><td>Hard <code>PostToolUse</code> hook (always runs, blocks on failure) + Step-5 self-check as first line</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Files</h2>
+  <ul class="files">
+    <li>NEW  premarket-briefing-skill/scripts/fetch_market_data.py</li>
+    <li>NEW  tests/test_quote_ledger.py</li>
+    <li>NEW  premarket-briefing-skill/scripts/validate_quote_hook.py  (PostToolUse wrapper around the validator)</li>
+    <li>EDIT .claude/settings.json  (PostToolUse hook registration — via update-config)</li>
+    <li>EDIT premarket-briefing-skill/SKILL.md  (Step 3a, Step 3.5, self-check, incident note, template tags)</li>
+    <li>EDIT premarket-briefing-skill/references/data-sources.md  (source table; 1.4 net-2 split)</li>
+    <li>EDIT premarket-briefing-skill/evals/validators/validate_briefing.py  (ledger cross-check)</li>
+  </ul>
+
+</div>
+</body>
+</html>
