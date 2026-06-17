@@ -80,6 +80,11 @@ Light calendar today — no tier-1 releases. Next material print is Wednesday's 
 
 **Notable overnight catalysts:** none beyond the earnings follow-through.
 
+**→ US Spillover Read (what it means at the open):**
+- China beta: KOSPI +1.4% (chip-heavy) and Nikkei +1.1% — firm overnight chip-risk appetite, tailwind for US semis at the open.
+- Yen carry: USD/JPY ~152.40 stable — no unwind threat to mega-cap tech.
+- **Net:** mild risk-on tailwind, led by chips — Asia echoed US tech strength overnight; follow-through over fade.
+
 ---
 
 *Briefing complete. Trade the plan, not the screen.*
