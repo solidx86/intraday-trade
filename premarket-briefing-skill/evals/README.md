@@ -4,7 +4,10 @@ These are **structural** evals, not content evals. The skill produces a daily ne
 
 - All 7 required section headings present, in order
 - A risk-on / risk-off verdict appears in 1.1
+- The four section-1.1 market-tape lines (Futures, Volatility, Sector tape, Commodities) are present
+- A Dollar/Yields regime token (SCARED / GREEDY / GOLDILOCKS / NEUTRAL) appears in 1.1
 - Economic events in 1.2 are impact-labeled
+- Global Spillover lists the full index set and closes with a → US Spillover Read block (or its benign-tape fallback)
 - Output is saved to `data/trade-journal/daily/YYYY-MM-DD/premarket.md`
 - Header includes a US trading date in `YYYY-MM-DD` form
 
@@ -16,7 +19,7 @@ The three test prompts cover different trigger phrasings:
 
 ## Running the structural validator
 
-The assertions above are enforced programmatically by `validators/validate_briefing.py` — a stdlib-only Python script that takes a generated `premarket.md` and runs six structural checks: file non-empty, header date, the seven section headings present and in order, a risk verdict in 1.1, an impact-labeled (or light-calendar) section 1.2, and the full Global Spillover index set.
+The assertions above are enforced programmatically by `validators/validate_briefing.py` — a stdlib-only Python script that takes a generated `premarket.md` and runs twelve structural checks: file non-empty; header date; the seven section headings present and in order; a risk-on/off verdict in 1.1; a Dollar/Yields regime token in 1.1; the four section-1.1 market-tape lines (Futures, Volatility, Sector tape, Commodities); an impact-labeled (or light-calendar) section 1.2; the full Global Spillover index set; and a → US Spillover Read block (or its benign-tape fallback).
 
 ```bash
 # From repo root:

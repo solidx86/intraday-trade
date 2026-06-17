@@ -72,6 +72,18 @@
         {
           "text": "Section 1.4 (Portfolio News) reports only watchlist tickers with news or a catalyst, grouped by theme; quiet tickers are dropped",
           "type": "qualitative"
+        },
+        {
+          "text": "Section 1.1 carries the four market-tape lines — '**Futures (implied open):**', '**Volatility:**' (VIX/VXN with a calm/normal/elevated/high tag), '**Sector tape:**', and '**Commodities:**' — each a real grepped figure or an explicit 'N/A — <reason>'. Present regardless of the casual trigger phrasing.",
+          "type": "structural"
+        },
+        {
+          "text": "Section 1.1 includes a Dollar/Yields regime classification — one of SCARED / GREEDY / GOLDILOCKS / NEUTRAL — with an evidenced DXY/US10Y direction. Present regardless of the casual trigger phrasing.",
+          "type": "qualitative"
+        },
+        {
+          "text": "Global Spillover closes with a '→ US Spillover Read' block (sector-level transmission channels + a '**Net:**' tilt line) or the benign-tape fallback ('no material spillover into the US open').",
+          "type": "qualitative"
         }
       ]
     },
@@ -95,6 +107,18 @@
         },
         {
           "text": "Briefing voice is plain English (no jargon like 'dot plot', 'hawkish bias', 'risk-parity rotation' without explanation)",
+          "type": "qualitative"
+        },
+        {
+          "text": "Section 1.1 carries the four market-tape lines — '**Futures (implied open):**', '**Volatility:**' (VIX/VXN with a calm/normal/elevated/high tag), '**Sector tape:**', and '**Commodities:**' — each a real grepped figure or an explicit 'N/A — <reason>'. Present regardless of the indirect trigger phrasing.",
+          "type": "structural"
+        },
+        {
+          "text": "Section 1.1 includes a Dollar/Yields regime classification — one of SCARED / GREEDY / GOLDILOCKS / NEUTRAL — with an evidenced DXY/US10Y direction. Present regardless of the indirect trigger phrasing.",
+          "type": "qualitative"
+        },
+        {
+          "text": "Global Spillover closes with a '→ US Spillover Read' block (sector-level transmission channels + a '**Net:**' tilt line) or the benign-tape fallback ('no material spillover into the US open').",
           "type": "qualitative"
         }
       ]
