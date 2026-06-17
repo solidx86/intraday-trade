@@ -81,3 +81,31 @@ def test_validator_group_tag_scopes_bullet():
     v = _load_vql()
     md = "- Semis **(pre-mkt)**: NVDA +0.51% ($208.47), and others.\n"
     assert v.validate(md, LEDGER) == []
+
+
+import subprocess
+
+HOOK = ROOT / "premarket-briefing-skill" / "scripts" / "validate_quote_hook.py"
+
+def _run_hook(event):
+    return subprocess.run([sys.executable, str(HOOK)], input=json.dumps(event),
+                          capture_output=True, text=True)
+
+def test_hook_ignores_non_premarket_write():
+    r = _run_hook({"tool_name": "Write", "tool_input": {"file_path": "/x/notes.md"}})
+    assert r.returncode == 0
+
+def test_hook_blocks_when_no_ledger(tmp_path):
+    bm = tmp_path / "daily" / "2026-06-17" / "premarket.md"
+    bm.parent.mkdir(parents=True); bm.write_text("- **NVDA** +0.51% ($208.47) *(pre-mkt)*\n")
+    r = _run_hook({"tool_name": "Write", "tool_input": {"file_path": str(bm)}})
+    assert r.returncode == 2
+    assert "no ledger" in (r.stdout + r.stderr).lower()
+
+def test_hook_passes_with_valid_ledger(tmp_path):
+    d = tmp_path / "daily" / "2026-06-17"; d.mkdir(parents=True)
+    (d / "premarket.md").write_text("- **NVDA** +0.51% ($208.47) *(pre-mkt)*\n")
+    (d / ".quote-ledger.json").write_text(json.dumps(
+        [{"symbol": "NVDA", "last": 208.47, "chg_pct": 0.51, "quote_type": "PRE-MKT"}]))
+    r = _run_hook({"tool_name": "Write", "tool_input": {"file_path": str(d / "premarket.md")}})
+    assert r.returncode == 0
