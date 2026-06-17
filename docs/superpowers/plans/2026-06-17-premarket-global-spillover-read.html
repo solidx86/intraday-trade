@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan — US Spillover Read for the Pre-Market Briefing</title>
+<style>
+  :root {
+    --ink: #1a1f29; --muted: #5c6675; --line: #e2e6ec; --bg: #fbfcfd;
+    --accent: #1f6feb; --warn-bg: #fff4e5; --warn-bd: #f0c27a;
+    --good-bg: #eaf6ec; --good-bd: #a9d8b3; --code-bg: #f4f6f8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font: 16px/1.62 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink); background: var(--bg); margin: 0; padding: 0;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 48px 28px 96px; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 { font-size: 21px; margin: 44px 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--line); letter-spacing: -0.01em; }
+  h3 { font-size: 17px; margin: 28px 0 8px; }
+  p, li { color: var(--ink); }
+  .meta { color: var(--muted); font-size: 14px; margin: 0 0 8px; }
+  .status { display: inline-block; background: var(--good-bg); border: 1px solid var(--good-bd);
+    color: #1e6b38; font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+  code { background: var(--code-bg); padding: 1.5px 5px; border-radius: 4px; font-size: 13.5px;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.5;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 8px 11px; text-align: left; vertical-align: top; }
+  th { background: #f0f3f7; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .callout { border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 14.5px; }
+  .warn { background: var(--warn-bg); border: 1px solid var(--warn-bd); }
+  .good { background: var(--good-bg); border: 1px solid var(--good-bd); }
+  ul, ol { padding-left: 22px; }
+  li { margin: 4px 0; }
+  hr { border: none; border-top: 1px solid var(--line); margin: 40px 0; }
+  .tag { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .task { border: 1px solid var(--line); border-radius: 10px; padding: 4px 18px 14px; margin: 18px 0; background: #fff; }
+  .files { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>US Spillover Read — Implementation Plan</h1>
+  <p class="meta"><strong>Date:</strong> 2026-06-17 &nbsp;·&nbsp; <strong>Skill:</strong> <code>premarket-briefing-skill</code> &nbsp;·&nbsp; <strong>Branch:</strong> <code>feat/premarket-global-spillover-read</code></p>
+  <p><span class="status">Review companion — source of truth is the .md</span></p>
+  <p class="meta">This HTML mirrors <code>docs/superpowers/plans/2026-06-17-premarket-global-spillover-read.md</code>. The <code>.md</code> drives execution; keep both in sync on any change.</p>
+
+  <p><strong>Goal:</strong> Add a sector-level <strong>→ US Spillover Read</strong> synthesis block to Global Market Spillover, and wire CNBC <code>asia-markets/</code> + <code>europe-markets/</code> as browser sources so KOSPI stops returning <code>N/A</code>.</p>
+  <p><strong>Architecture:</strong> Additive. Per-index data lines stay; a new closing block translates the overnight tape into a US-open read across four channels (China beta · yen carry · Europe→US · oil/rates) + a <code>Net:</code> line, gated to material moves, collapsing to one benign line on a quiet tape. A new reference (<code>global-spillover-read.md</code>) holds the framework; a new validator check enforces it; both sample fixtures exercise it (one fired, one benign).</p>
+
+  <div class="callout good"><span class="tag">Commit conventions</span><br>
+    Repo identity <code>Shoo Kyuk Wei &lt;1960463+solidx86@users.noreply.github.com&gt;</code>; every message ends with
+    <code>Co-Authored-By: Claude Opus 4.8 &lt;noreply@anthropic.com&gt;</code>. Leak test: textbook macro spillover only — no P1/P2/P3, no parameters, no tell-set.</div>
+
+  <h2>File structure</h2>
+  <table>
+    <thead><tr><th>File</th><th>Change</th></tr></thead>
+    <tbody>
+      <tr><td><code>references/global-spillover-read.md</code></td><td><strong>Create</strong> — channel framework + gating</td></tr>
+      <tr><td><code>references/data-sources.md</code></td><td>Modify — two CNBC regional pages + pointers</td></tr>
+      <tr><td><code>SKILL.md</code></td><td>Modify — template block + Step 3c pointer</td></tr>
+      <tr><td><code>evals/validators/validate_briefing.py</code></td><td>Modify — <code>check_spillover_read</code>, wire, docstring item 9</td></tr>
+      <tr><td><code>tests/test_premarket_validator.py</code></td><td>Modify — bite tests + wiring test</td></tr>
+      <tr><td><code>examples/sample-journal/daily/2026-04-06/premarket.md</code></td><td>Modify — fired-channel block</td></tr>
+      <tr><td><code>examples/sample-journal/daily/2026-04-08/premarket.md</code></td><td>Modify — benign-fallback line</td></tr>
+      <tr><td><code>evals/evals.json</code></td><td>Modify — one rubric criterion</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Tasks</h2>
+
+  <div class="task">
+    <h3>Task 1 — Track the spec + plan docs</h3>
+    <p>Confirm <code>git branch --show-current</code> = <code>feat/premarket-global-spillover-read</code>, then commit the spec HTML + plan <code>.md</code>/<code>.html</code> as <code>docs: track 2026-06-17 global-spillover-read spec + plan</code>.</p>
+  </div>
+
+  <div class="task">
+    <h3>Task 2 — New reference <code>global-spillover-read.md</code></h3>
+    <p class="files">Create: premarket-briefing-skill/references/global-spillover-read.md</p>
+    <p>Channel table + gating (sector-level only, no new numbers, no tickers):</p>
+    <table>
+      <thead><tr><th>Channel</th><th>Signal</th><th>US sectors</th></tr></thead>
+      <tbody>
+        <tr><td>China beta</td><td>HSI / Shanghai / KOSPI on demand·property·stimulus·tech-policy</td><td>China-rev semis, materials/miners, industrials, luxury/casino, autos</td></tr>
+        <tr><td>Yen carry</td><td>USD/JPY + Nikkei — sharp JPY strengthening</td><td>High-beta growth &amp; mega-cap tech; risk-off tilt</td></tr>
+        <tr><td>Europe → US</td><td>DAX/FTSE/STOXX + sector tape + ECB/BOE</td><td>US financials, industrials/autos, energy/defense</td></tr>
+        <tr><td>Cross-asset</td><td>Overnight oil + global yields (light)</td><td>Energy/transports, rate-sensitives</td></tr>
+        <tr><td>Net</td><td>Aggregate of fired channels</td><td>Punchline: tailwind / headwind / neutral + most-affected sector</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Gating:</strong> fire only on a material move (index ≈≥1% on a driver, USD/JPY ≈≥1%/intervention, a named catalyst, or a notable sector divergence). Benign tape → one line: <em>"Overnight tape benign — no material spillover into the US open."</em></p>
+  </div>
+
+  <div class="task">
+    <h3>Task 3 — Wire CNBC regional pages into <code>data-sources.md</code></h3>
+    <p>Asia Indices subsection: add <code>browser_navigate https://www.cnbc.com/markets/asia-markets/</code> as the <strong>primary KOSPI source</strong> + theme headlines (BOJ/yen, China property/stimulus). Europe Indices subsection: add <code>browser_navigate https://www.cnbc.com/markets/europe-markets/</code> for themes (ECB/BOE, banks, energy/defense). Both note "feeds the → US Spillover Read" and point at the new reference. Same capture recipe (grep the saved snapshot; never <code>browser_snapshot</code> without a filename).</p>
+  </div>
+
+  <div class="task">
+    <h3>Task 4 — SKILL.md template block + Step 3c pointer</h3>
+    <p>Append to the Global Market Spillover template, after <em>Notable overnight catalysts</em>:</p>
+    <pre>**→ US Spillover Read (what it means at the open):**
+- [Channel]: [overnight tape] — [sector effect on the US open]. *(only channels that cleared the bar)*
+- **Net:** [tailwind / headwind / neutral overnight] — [single most-affected US sector].
+
+(Sector-level only — no watchlist tickers, no number not already in the Tape Table /
+Asia-Europe grep. Quiet tape → one line: "Overnight tape benign — no material spillover
+into the US open." Channels + gating: references/global-spillover-read.md.)</pre>
+    <p>Step 3c Global Spillover bullet rewritten to route the two CNBC pages + compose the block per the new reference.</p>
+  </div>
+
+  <div class="task">
+    <h3>Task 5 — Validator: bite tests + <code>check_spillover_read</code> (unwired) <span class="tag">TDD</span></h3>
+    <p class="files">Modify: tests/test_premarket_validator.py · evals/validators/validate_briefing.py</p>
+    <p>Five bite tests: fired-block-with-Net passes; benign-fallback passes without Net; block-absent fails; fired-block-missing-Net fails; scoped-to-Global-Spillover-only. Implement the check (not yet wired — full suite stays green):</p>
+    <pre>def check_spillover_read(sections):
+    body = sections.get("## Global Market Spillover", "")
+    has_marker = "US Spillover Read" in body
+    benign = "no material spillover" in body
+    if not has_marker and not benign:
+        return CheckResult("spillover_read", False,
+            "no '→ US Spillover Read' block and no benign-tape fallback line")
+    if benign:
+        return CheckResult("spillover_read", True,
+            "benign-tape spillover read (no Net line required)")
+    if re.search(r"\*\*Net:\*\*", body):
+        return CheckResult("spillover_read", True, "US Spillover Read block with Net line")
+    return CheckResult("spillover_read", False,
+        "US Spillover Read block present but missing a '**Net:**' line")</pre>
+  </div>
+
+  <div class="task">
+    <h3>Task 6 — Sample fixtures: fired (04-06) + benign (04-08)</h3>
+    <p><strong>2026-04-06</strong> (Nikkei +1.1%, KOSPI +1.4% — material) gets a fired block:</p>
+    <pre>**→ US Spillover Read (what it means at the open):**
+- China beta: KOSPI +1.4% (chip-heavy) and Nikkei +1.1% — firm overnight chip-risk
+  appetite, tailwind for US semis at the open.
+- Yen carry: USD/JPY ~152.40 stable — no unwind threat to mega-cap tech.
+- **Net:** mild risk-on tailwind, led by chips — Asia echoed US tech strength; follow-through over fade.</pre>
+    <p><strong>2026-04-08</strong> (all sub-1%, "quiet"/"coiled") gets the benign fallback:</p>
+    <pre>**→ US Spillover Read (what it means at the open):**
+- Overnight tape benign — no material spillover into the US open; the session coils around the 8:30 CPI print.</pre>
+    <p>Full suite stays green (check wired in Task 7).</p>
+  </div>
+
+  <div class="task">
+    <h3>Task 7 — Wire into <code>run_all_checks</code> + docstring <span class="tag">TDD</span></h3>
+    <p>Add the failing wiring test (<code>test_run_all_checks_wires_in_spillover_read</code>), then add <code>check_spillover_read(sections),</code> after <code>check_global_spillover(sections),</code> (result rows 11 → 12) and docstring item 9. <code>pytest -q</code> green; both fixtures report <strong>12/12</strong> (04-06 via Net, 04-08 via benign fallback).</p>
+  </div>
+
+  <div class="task">
+    <h3>Task 8 — evals.json rubric criterion</h3>
+    <p>Add one <code>qualitative</code> criterion to scenario id 1 after the Global Spillover indices criterion, describing the → US Spillover Read block (channels + Net line, or benign fallback; sector-level only). Verify the JSON still parses.</p>
+  </div>
+
+  <div class="task">
+    <h3>Task 9 — Final verification</h3>
+    <p><code>pytest -q</code> green; validator <strong>12/12</strong> on both fixtures; leak-test the new reference by eye; <code>git status</code> clean + commits from Tasks 1–8 present.</p>
+  </div>
+
+  <hr>
+
+  <h2>Self-review — spec coverage</h2>
+  <table>
+    <thead><tr><th>Spec requirement</th><th>Task</th></tr></thead>
+    <tbody>
+      <tr><td>CNBC asia/europe wired as browser sources; KOSPI sourced (no N/A)</td><td>3</td></tr>
+      <tr><td>→ US Spillover Read block, sector-level, after Notable catalysts</td><td>2, 4</td></tr>
+      <tr><td>Channel framework + gating (material-move, benign fallback, no new numbers)</td><td>2, 4</td></tr>
+      <tr><td>New reference <code>global-spillover-read.md</code></td><td>2</td></tr>
+      <tr><td><code>check_spillover_read</code> + run_all_checks (11→12) + docstring item 9</td><td>5, 7</td></tr>
+      <tr><td>Bite tests (fired/benign pass, absent/missing-Net fail, scoped)</td><td>5, 7</td></tr>
+      <tr><td>Both sample fixtures updated (fired + benign)</td><td>6</td></tr>
+      <tr><td>evals.json rubric criterion</td><td>8</td></tr>
+      <tr><td>Leak test</td><td>9</td></tr>
+    </tbody>
+  </table>
+  <p class="meta"><strong>Out of scope (deferred):</strong> watchlist-ticker attribution, 1.1 mood/regime cross-reference, quantitative spillover scoring, README (no spillover reference present).</p>
+
+</div>
+</body>
+</html>

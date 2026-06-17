@@ -133,3 +133,76 @@ def test_run_all_checks_wires_in_tape_lines():
     )
     results = validate_briefing.run_all_checks(sample)
     assert set(TAPE_CHECK_NAMES) <= {r.name for r in results}
+
+
+# --- US Spillover Read (Global Spillover synthesis block) ------------------
+
+SECTION_SPILLOVER = "## Global Market Spillover"
+
+SPILLOVER_FIRED_BODY = (
+    "**Nikkei 225**: +1.1% · **KOSPI**: +1.4% — chip-heavy, firm.\n"
+    "**USD/JPY:** ~152.40 — stable.\n\n"
+    "**→ US Spillover Read (what it means at the open):**\n"
+    "- China beta: KOSPI +1.4% (chip-heavy) + Nikkei +1.1% — tailwind for US semis.\n"
+    "- Yen carry: USD/JPY stable — no unwind threat to mega-cap tech.\n"
+    "- **Net:** mild risk-on tailwind, led by chips — follow-through over fade.\n"
+)
+
+SPILLOVER_BENIGN_BODY = (
+    "**Nikkei 225**: −0.4% · **KOSPI**: −0.6% — quiet, coiled.\n"
+    "**USD/JPY:** ~152.90 — slightly firmer.\n\n"
+    "**→ US Spillover Read (what it means at the open):**\n"
+    "- Overnight tape benign — no material spillover into the US open.\n"
+)
+
+
+def test_spillover_read_passes_with_fired_block_and_net():
+    result = validate_briefing.check_spillover_read({SECTION_SPILLOVER: SPILLOVER_FIRED_BODY})
+    assert result.passed, result.detail
+
+
+def test_spillover_read_passes_with_benign_fallback_without_net():
+    result = validate_briefing.check_spillover_read({SECTION_SPILLOVER: SPILLOVER_BENIGN_BODY})
+    assert result.passed, result.detail
+
+
+def test_spillover_read_fails_when_block_absent():
+    body = (
+        "**Nikkei 225**: +1.1% · **KOSPI**: +1.4%\n"
+        "**USD/JPY:** ~152.40 — stable.\n"
+        "**Notable overnight catalysts:** none.\n"
+    )
+    result = validate_briefing.check_spillover_read({SECTION_SPILLOVER: body})
+    assert not result.passed
+
+
+def test_spillover_read_fails_when_fired_block_missing_net():
+    body = (
+        "**→ US Spillover Read (what it means at the open):**\n"
+        "- China beta: HSI green — no drag on semis.\n"
+        "- Yen carry: USD/JPY stable — no unwind threat.\n"
+    )
+    result = validate_briefing.check_spillover_read({SECTION_SPILLOVER: body})
+    assert not result.passed
+
+
+def test_spillover_read_scoped_to_global_spillover_only():
+    # A spillover block in another section must not satisfy the check.
+    sections = {
+        SECTION_SPILLOVER: "**Nikkei 225**: +1.1% — no spillover read here.\n",
+        "## Quick Summary": (
+            "**→ US Spillover Read** **Net:** tailwind, but in the wrong section.\n"
+        ),
+    }
+    result = validate_briefing.check_spillover_read(sections)
+    assert not result.passed
+
+
+def test_run_all_checks_wires_in_spillover_read():
+    from journal_schema import journal_trees, premarket_files
+
+    sample = next(
+        f for tree in journal_trees() for f in premarket_files(tree)
+    )
+    results = validate_briefing.run_all_checks(sample)
+    assert "spillover_read" in {r.name for r in results}

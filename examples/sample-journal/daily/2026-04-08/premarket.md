@@ -86,6 +86,9 @@ Note: trade *after* the CPI reaction settles, not into the print.
 
 **Notable overnight catalysts:** none — the session is a coiled spring around the 8:30 print.
 
+**→ US Spillover Read (what it means at the open):**
+- Overnight tape benign — no material spillover into the US open; the session coils around the 8:30 CPI print.
+
 ---
 
 *Briefing complete. Trade the plan, not the screen.*
