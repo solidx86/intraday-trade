@@ -167,24 +167,30 @@ The rest of **Market News & Catalysts** — the top-5 headlines and the M&A / re
 
 ### Global Spillover — Asia Indices
 
-**Step 3a first:** the CNBC tape pull already carries Nikkei, Hang Seng, Shanghai (and ASX/STI). Route from the Tape Table; only run the searches below for an index the tape missed (e.g. KOSPI, which CNBC may not list) or to get the *theme* behind a move.
+**Step 3a first:** the CNBC pre-markets tape carries Nikkei, Hang Seng, Shanghai (and ASX/STI). Route those from the Tape Table.
 
+**KOSPI + gaps — CNBC `asia-markets/` (browser):** the pre-markets tape does **not** list KOSPI. Top up from `browser_navigate https://www.cnbc.com/markets/asia-markets/` — grep the saved snapshot for the index rows and read the per-region driver headlines (BOJ/yen, China property/stimulus/tech-policy). Same capture recipe as Step 3a: never `browser_snapshot` without a `filename`. This is the **primary** KOSPI source; the WebSearches below are the fallback.
+
+- `WebSearch "KOSPI close [DATE]"`
 - `WebSearch "Nikkei 225 close [DATE]"`
 - `WebSearch "Hang Seng close [DATE]"`
-- `WebSearch "KOSPI close [DATE]"`
 - `WebSearch "Shanghai Composite close [DATE]"`
 - `browser_navigate https://www.investing.com/indices/major-indices` (fallback — spot levels; Cloudflare-blocks WebFetch)
 
 **Themes to watch for:** BOJ policy moves, China stimulus/property/tech crackdown, Japan/US trade tensions, yen interventions.
 
+**Feeds the → US Spillover Read** China-beta and yen-carry channels — see `references/global-spillover-read.md`.
+
 ### Global Spillover — Europe Indices
 
-**Step 3a first:** the CNBC tape pull carries DAX, FTSE, CAC, and STOXX. Route from the Tape Table; use the searches below only for a missing index or the driving theme.
+**Step 3a first:** the CNBC pre-markets tape carries DAX, FTSE, CAC, and STOXX. Route from the Tape Table.
+
+**Themes + gaps — CNBC `europe-markets/` (browser):** `browser_navigate https://www.cnbc.com/markets/europe-markets/` — grep the saved snapshot for the index rows and the driver headlines (ECB/BOE, European banks, energy/defense). Same capture recipe as Step 3a. Use for a missing index or the driving theme.
 
 - `WebSearch "DAX FTSE KOSPI KLCI STOXX [DATE]"`
 - `browser_navigate https://www.investing.com/indices/europe-indices` (Cloudflare-blocks WebFetch)
 
-**Goal:** mid-session levels and the dominant theme — usually ECB/BOE policy, energy prices, or a major European earnings story.
+**Goal:** mid-session levels and the dominant theme — usually ECB/BOE policy, energy prices, or a major European earnings story. **Feeds the → US Spillover Read** Europe→US channel — see `references/global-spillover-read.md`.
 
 ### Global Spillover — USD/JPY
 
