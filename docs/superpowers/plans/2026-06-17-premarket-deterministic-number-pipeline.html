@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Implementation Plan — Deterministic Number Pipeline for the Pre-Market Briefing</title><style>
+  :root{--ink:#1a1f29;--muted:#5c6675;--line:#e2e6ec;--bg:#fbfcfd;--accent:#1f6feb;--code-bg:#f4f6f8;--warn-bg:#fff4e5;--warn-bd:#f0c27a;}
+  *{box-sizing:border-box}body{font:16px/1.62 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);margin:0}
+  .wrap{max-width:880px;margin:0 auto;padding:48px 28px 96px}
+  h1{font-size:29px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
+  h2{font-size:21px;margin:40px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+  h3{font-size:17px;margin:26px 0 8px}h4{font-size:15px;margin:18px 0 6px;color:#33415c}
+  p,li{color:var(--ink)}code{background:var(--code-bg);padding:1.5px 5px;border-radius:4px;font-size:13px;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:#0f1722;color:#e6edf3;border-radius:8px;padding:14px 16px;overflow-x:auto;font-size:12.5px;line-height:1.5;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre code{background:none;color:inherit;padding:0}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14px}th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}th{background:#f0f3f7;font-weight:600}tr:nth-child(even) td{background:#fafbfc}
+  blockquote{background:var(--warn-bg);border:1px solid var(--warn-bd);border-radius:8px;padding:10px 16px;margin:16px 0;font-size:14.5px}
+  ul,ol{padding-left:22px}li{margin:4px 0}hr{border:none;border-top:1px solid var(--line);margin:34px 0}
+  .chk{list-style:none;margin-left:-18px}.chk>li::before{content:"\2610  ";color:var(--accent);font-weight:700}
+</style></head><body><div class="wrap">
+<h1>Deterministic Number Pipeline Implementation Plan</h1>
+<blockquote><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</blockquote>
+<p><strong>Goal:</strong> Remove model-read numbers from the pre-market briefing — a script fetches every price/percent from CNBC&#x27;s structured JSON into a machine ledger, and a validator (enforced by a hard hook) fails any briefing whose numbers don&#x27;t trace to that ledger.</p>
+<p><strong>Architecture:</strong> A stdlib-only Python fetcher (<code>fetch_market_data.py</code>) pulls CNBC&#x27;s <code>quote.htm</code> JSON (tape + per-ticker) and writes a <code>.quote-ledger.json</code> sidecar + a markdown ledger. A validator (<code>validate_quote_ledger.py</code>) cross-checks the saved <code>premarket.md</code>&#x27;s tagged numbers against that sidecar. A <code>PostToolUse</code> hook runs the validator on every briefing write and blocks on failure. SKILL.md / data-sources.md are rewritten to drive numbers from the script and tag each with its session.</p>
+<p><strong>Tech Stack:</strong> Python 3 stdlib only (<code>urllib</code>, <code>json</code>, <code>re</code>) — no <code>pip</code> (system python3 is PEP-668-locked). CNBC is the single structured source; it accepts a batched symbol list in one request, so no threadpool and no second-endpoint auth are needed. pytest for CI. Claude Code <code>settings.json</code> hooks.</p>
+<p><strong>Spec:</strong> <code>docs/superpowers/specs/2026-06-17-premarket-deterministic-number-pipeline-design.html</code></p>
+<p><strong>Sourcing decision:</strong> <strong>CNBC <code>quote.htm</code> only.</strong> No Yahoo cross-check or fallback (dropped for simplicity — CNBC already provides typed pre-market, timestamp, prior close, and exact-symbol echo). On any CNBC miss the row is <code>N/A</code> (never guessed); the browser CNBC market pages remain a documented <strong>manual</strong> last-resort. The symbol-echo check (CNBC must return the exact symbol requested) is retained — it is what prevents a GOOG-for-GOOGL substitution.</p>
+<p><strong>Endpoint facts verified live 2026-06-17 (build against these):</strong></p>
+<ul>
+<li><code>GET https://quote.cnbc.com/quote-html-webservice/quote.htm?symbols=&lt;PIPE_LIST&gt;&amp;requestMethod=itv&amp;exthrs=1&amp;output=json</code> → <code>{&quot;ITVQuoteResult&quot;:{&quot;ITVQuote&quot;:[ {...} ]}}</code>. No auth. Per quote: <code>symbol</code>, <code>previous_day_closing</code>, <code>last</code>, <code>change_pct</code> (e.g. <code>&quot;-0.50%&quot;</code>), <code>curmktstatus</code> (<code>REG_MKT</code>/<code>PRE_MKT</code>/…), and <code>ExtendedMktQuote</code>: <code>{type:&quot;PRE_MKT&quot;, last, change_pct, last_timedate:&quot;9:30 AM EDT&quot;, last_time:&quot;2026-06-17T09:30:00-0400&quot;}</code>.</li>
+</ul>
+<hr>
+<h2>File Structure</h2>
+<table><thead><tr><th>File</th><th>Responsibility</th></tr></thead><tbody>
+<tr><td><code>premarket-briefing-skill/scripts/fetch_market_data.py</code> (NEW)</td><td>Fetch CNBC <code>quote.htm</code> (tape + per-ticker); emit ledger JSON sidecar + markdown to stdout. Pure parse function + orchestration + CLI.</td></tr>
+<tr><td><code>premarket-briefing-skill/scripts/validate_quote_ledger.py</code> (NEW)</td><td>Parse the briefing&#x27;s tagged numbers; cross-check vs the ledger sidecar; CLI with exit codes. Single responsibility.</td></tr>
+<tr><td><code>premarket-briefing-skill/scripts/validate_quote_hook.py</code> (NEW)</td><td>PostToolUse wrapper: read stdin event JSON → match <code>daily/*/premarket.md</code> → locate sibling ledger → call the validator → emit block decision.</td></tr>
+<tr><td><code>tests/test_quote_ledger.py</code> (NEW)</td><td>CI: parse fixtures, validator pass/fail cases, hook stdin/path wrapper. Offline (recorded fixtures, no network).</td></tr>
+<tr><td><code>tests/fixtures/cnbc_quote_sample.json</code> (NEW)</td><td>Recorded CNBC response for deterministic parser tests.</td></tr>
+<tr><td><code>premarket-briefing-skill/SKILL.md</code> (MODIFY)</td><td>Step 3a + 3.5 rewrite; <code>(pre-mkt)</code>/<code>(prior close)</code>/<code>(N/A)</code> template tags; final self-check; incident note.</td></tr>
+<tr><td><code>premarket-briefing-skill/references/data-sources.md</code> (MODIFY)</td><td>Source reclassification: CNBC structured = price; finviz = non-price; Section 1.4 net-2 split.</td></tr>
+<tr><td><code>premarket-briefing-skill/evals/validators/validate_briefing.py</code> (MODIFY)</td><td>Thin call into <code>validate_quote_ledger</code> when a ledger sidecar is present.</td></tr>
+<tr><td><code>.claude/settings.json</code> (MODIFY)</td><td>Register the PostToolUse hook.</td></tr>
+</tbody></table>
+<p><strong>Branch:</strong> already on <code>feat/premarket-deterministic-number-pipeline</code> (spec committed). All tasks commit here.</p>
+<hr>
+<h2>Task 1: CNBC parser (pure function)</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>premarket-briefing-skill/scripts/fetch_market_data.py</code></li>
+<li>Create: <code>tests/fixtures/cnbc_quote_sample.json</code></li>
+<li>Test: <code>tests/test_quote_ledger.py</code></li>
+</ul>
+<ul class="chk">
+<li><strong>Step 1: Record the CNBC fixture.</strong> Create <code>tests/fixtures/cnbc_quote_sample.json</code> with a trimmed real response (two pre-market names, one prior-close-only name, one wrong-class name):</li>
+</ul>
+<pre><code>{&quot;ITVQuoteResult&quot;:{&quot;ITVQuote&quot;:[
+  {&quot;symbol&quot;:&quot;NVDA&quot;,&quot;previous_day_closing&quot;:&quot;207.41&quot;,&quot;last&quot;:&quot;207.41&quot;,&quot;change_pct&quot;:&quot;0%&quot;,&quot;curmktstatus&quot;:&quot;PRE_MKT&quot;,
+   &quot;ExtendedMktQuote&quot;:{&quot;type&quot;:&quot;PRE_MKT&quot;,&quot;last&quot;:&quot;208.47&quot;,&quot;change_pct&quot;:&quot;+0.51%&quot;,&quot;last_timedate&quot;:&quot;9:18 AM EDT&quot;,&quot;last_time&quot;:&quot;2026-06-17T09:18:00-0400&quot;}},
+  {&quot;symbol&quot;:&quot;GOOGL&quot;,&quot;previous_day_closing&quot;:&quot;373.25&quot;,&quot;last&quot;:&quot;373.25&quot;,&quot;change_pct&quot;:&quot;0%&quot;,&quot;curmktstatus&quot;:&quot;PRE_MKT&quot;,
+   &quot;ExtendedMktQuote&quot;:{&quot;type&quot;:&quot;PRE_MKT&quot;,&quot;last&quot;:&quot;371.34&quot;,&quot;change_pct&quot;:&quot;-0.51%&quot;,&quot;last_timedate&quot;:&quot;9:18 AM EDT&quot;,&quot;last_time&quot;:&quot;2026-06-17T09:18:00-0400&quot;}},
+  {&quot;symbol&quot;:&quot;AVGO&quot;,&quot;previous_day_closing&quot;:&quot;393.94&quot;,&quot;last&quot;:&quot;376.71&quot;,&quot;change_pct&quot;:&quot;-4.37%&quot;,&quot;curmktstatus&quot;:&quot;REG_MKT&quot;},
+  {&quot;symbol&quot;:&quot;GOOG&quot;,&quot;previous_day_closing&quot;:&quot;372.00&quot;,&quot;last&quot;:&quot;372.00&quot;,&quot;change_pct&quot;:&quot;0%&quot;,&quot;curmktstatus&quot;:&quot;PRE_MKT&quot;,
+   &quot;ExtendedMktQuote&quot;:{&quot;type&quot;:&quot;PRE_MKT&quot;,&quot;last&quot;:&quot;370.00&quot;,&quot;change_pct&quot;:&quot;-0.54%&quot;,&quot;last_timedate&quot;:&quot;9:18 AM EDT&quot;,&quot;last_time&quot;:&quot;2026-06-17T09:18:00-0400&quot;}}
+]}}</code></pre>
+<ul class="chk">
+<li><strong>Step 2: Write the failing test</strong> in <code>tests/test_quote_ledger.py</code>:</li>
+</ul>
+<pre><code>import json, pathlib, sys
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / &quot;premarket-briefing-skill&quot; / &quot;scripts&quot;))
+import fetch_market_data as fmd
+
+FIX = pathlib.Path(__file__).parent / &quot;fixtures&quot; / &quot;cnbc_quote_sample.json&quot;
+
+def test_parse_cnbc_premarket_row():
+    rows = fmd.parse_cnbc(FIX.read_text(), [&quot;NVDA&quot;, &quot;GOOGL&quot;, &quot;AVGO&quot;])
+    nvda = rows[&quot;NVDA&quot;]
+    assert nvda[&quot;quote_type&quot;] == &quot;PRE-MKT&quot;
+    assert nvda[&quot;last&quot;] == 208.47
+    assert nvda[&quot;chg_pct&quot;] == 0.51
+    assert nvda[&quot;prior_close&quot;] == 207.41
+    assert nvda[&quot;timestamp&quot;] == &quot;9:18 AM EDT&quot;
+    assert nvda[&quot;source&quot;] == &quot;CNBC&quot;
+
+def test_parse_cnbc_prior_close_when_no_ext():
+    rows = fmd.parse_cnbc(FIX.read_text(), [&quot;AVGO&quot;])
+    assert rows[&quot;AVGO&quot;][&quot;quote_type&quot;] == &quot;PRIOR-CLOSE&quot;
+    assert rows[&quot;AVGO&quot;][&quot;last&quot;] == 376.71      # regular last, not ext
+    assert rows[&quot;AVGO&quot;][&quot;chg_pct&quot;] == -4.37
+
+def test_parse_cnbc_symbol_echo_mismatch_is_na():
+    # GOOGL is present and correct; a requested-but-absent symbol must be N/A,
+    # never silently served another class (e.g. GOOG).
+    rows = fmd.parse_cnbc(FIX.read_text(), [&quot;GOOGL&quot;])
+    assert rows[&quot;GOOGL&quot;][&quot;quote_type&quot;] == &quot;PRE-MKT&quot;
+    rows2 = fmd.parse_cnbc(FIX.read_text(), [&quot;MSFT&quot;])
+    assert rows2[&quot;MSFT&quot;][&quot;quote_type&quot;] == &quot;N/A&quot;
+    assert &quot;not returned&quot; in rows2[&quot;MSFT&quot;][&quot;note&quot;]</code></pre>
+<ul class="chk">
+<li><strong>Step 3: Run it, expect failure.</strong> Run: <code>cd &quot;$(git rev-parse --show-toplevel)&quot; &amp;&amp; python3 -m pytest tests/test_quote_ledger.py -q</code>. Expected: <code>ModuleNotFoundError: fetch_market_data</code> / <code>AttributeError: parse_cnbc</code>.</li>
+</ul>
+<ul class="chk">
+<li><strong>Step 4: Implement <code>parse_cnbc</code></strong> in <code>fetch_market_data.py</code>:</li>
+</ul>
+<pre><code>&quot;&quot;&quot;Deterministic market-data fetch for the pre-market briefing.
+
+Numbers come from CNBC&#x27;s structured JSON only, never from model-read pages.
+stdlib only — runs under PEP-668-locked python3. On any miss a row is N/A
+(never guessed); the browser CNBC pages are the manual last-resort.
+&quot;&quot;&quot;
+import json, re
+
+def _to_float(s):
+    if s is None:
+        return None
+    try:
+        return float(str(s).replace(&quot;,&quot;, &quot;&quot;).replace(&quot;%&quot;, &quot;&quot;).replace(&quot;+&quot;, &quot;&quot;).strip())
+    except ValueError:
+        return None
+
+def _na(symbol, note):
+    return {&quot;symbol&quot;: symbol, &quot;quote_type&quot;: &quot;N/A&quot;, &quot;prior_close&quot;: None, &quot;last&quot;: None,
+            &quot;chg_pct&quot;: None, &quot;timestamp&quot;: None, &quot;source&quot;: &quot;CNBC&quot;, &quot;note&quot;: note}
+
+def parse_cnbc(json_text, requested_symbols):
+    &quot;&quot;&quot;Map requested symbols -&gt; ledger row. Symbol echo is verified: a requested
+    symbol not present in the response (or a class mismatch like GOOG for GOOGL)
+    becomes an N/A row rather than a wrong number.&quot;&quot;&quot;
+    data = json.loads(json_text)
+    quotes = data.get(&quot;ITVQuoteResult&quot;, {}).get(&quot;ITVQuote&quot;, [])
+    if isinstance(quotes, dict):
+        quotes = [quotes]
+    by_symbol = {q.get(&quot;symbol&quot;): q for q in quotes}
+    rows = {}
+    for sym in requested_symbols:
+        q = by_symbol.get(sym)
+        if q is None:
+            rows[sym] = _na(sym, &quot;symbol not returned by CNBC&quot;)
+            continue
+        prior = _to_float(q.get(&quot;previous_day_closing&quot;))
+        ext = q.get(&quot;ExtendedMktQuote&quot;) or {}
+        if ext.get(&quot;type&quot;) == &quot;PRE_MKT&quot; and ext.get(&quot;last_time&quot;):
+            rows[sym] = {&quot;symbol&quot;: sym, &quot;quote_type&quot;: &quot;PRE-MKT&quot;, &quot;prior_close&quot;: prior,
+                         &quot;last&quot;: _to_float(ext.get(&quot;last&quot;)), &quot;chg_pct&quot;: _to_float(ext.get(&quot;change_pct&quot;)),
+                         &quot;timestamp&quot;: ext.get(&quot;last_timedate&quot;), &quot;source&quot;: &quot;CNBC&quot;, &quot;note&quot;: &quot;&quot;}
+        else:
+            rows[sym] = {&quot;symbol&quot;: sym, &quot;quote_type&quot;: &quot;PRIOR-CLOSE&quot;, &quot;prior_close&quot;: prior,
+                         &quot;last&quot;: _to_float(q.get(&quot;last&quot;)), &quot;chg_pct&quot;: _to_float(q.get(&quot;change_pct&quot;)),
+                         &quot;timestamp&quot;: q.get(&quot;last_timedate&quot;), &quot;source&quot;: &quot;CNBC&quot;, &quot;note&quot;: &quot;&quot;}
+    return rows</code></pre>
+<ul class="chk">
+<li><strong>Step 5: Run tests, expect pass.</strong> Run: <code>python3 -m pytest tests/test_quote_ledger.py -q</code>. Expected: 3 passed.</li>
+</ul>
+<ul class="chk">
+<li><strong>Step 6: Commit.</strong></li>
+</ul>
+<pre><code>git add premarket-briefing-skill/scripts/fetch_market_data.py tests/test_quote_ledger.py tests/fixtures/cnbc_quote_sample.json
+git commit -m &quot;feat(premarket): deterministic CNBC quote parser + fixture&quot;</code></pre>
+<hr>
+<h2>Task 2: Orchestration + CLI (batch, ordered output, sidecar, markdown)</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>premarket-briefing-skill/scripts/fetch_market_data.py</code></li>
+<li>Test: <code>tests/test_quote_ledger.py</code></li>
+</ul>
+<ul class="chk">
+<li><strong>Step 1: Write the failing test</strong> (append to <code>tests/test_quote_ledger.py</code>):</li>
+</ul>
+<pre><code>def test_format_markdown_columns():
+    ledger = [{&quot;symbol&quot;:&quot;NVDA&quot;,&quot;prior_close&quot;:207.41,&quot;last&quot;:208.47,&quot;chg_pct&quot;:0.51,
+               &quot;timestamp&quot;:&quot;9:18 AM EDT&quot;,&quot;source&quot;:&quot;CNBC&quot;,&quot;quote_type&quot;:&quot;PRE-MKT&quot;,&quot;note&quot;:&quot;&quot;}]
+    md = fmd.format_markdown(ledger)
+    assert &quot;NVDA&quot; in md and &quot;PRE-MKT&quot; in md and &quot;208.47&quot; in md
+    assert md.splitlines()[0].startswith(&quot;| symbol&quot;)
+
+def test_order_preserved():
+    rows = {&quot;B&quot;: {&quot;symbol&quot;: &quot;B&quot;}, &quot;A&quot;: {&quot;symbol&quot;: &quot;A&quot;}}
+    out = fmd.order_rows(rows, [&quot;A&quot;, &quot;B&quot;])
+    assert [r[&quot;symbol&quot;] for r in out] == [&quot;A&quot;, &quot;B&quot;]</code></pre>
+<ul class="chk">
+<li><strong>Step 2: Run, expect failure.</strong> Run: <code>python3 -m pytest tests/test_quote_ledger.py -q</code>. Expected: FAIL (<code>format_markdown</code>/<code>order_rows</code> undefined).</li>
+</ul>
+<ul class="chk">
+<li><strong>Step 3: Implement</strong> the symbol map, orchestration, and CLI in <code>fetch_market_data.py</code>:</li>
+</ul>
+<pre><code>import urllib.request, urllib.parse, ssl, sys, os
+
+_UA = {&quot;User-Agent&quot;: &quot;Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36&quot;}
+_CTX = ssl.create_default_context()
+
+# CNBC tape symbology. VERIFY each against the live endpoint in Step 5; any symbol
+# that does not resolve is emitted as N/A (never guessed). Confirmed working
+# 2026-06-17: AAPL-style tickers, .SPX, .VIX, @CL.1, .GDAXI, .N225, .KS11.
+TAPE_SYMBOLS = [
+    &quot;@ES.1&quot;, &quot;@NQ.1&quot;, &quot;@YM.1&quot;,           # futures
+    &quot;.VIX&quot;, &quot;.VXN&quot;,                       # volatility
+    &quot;US10Y&quot;,                              # 10-yr yield (verify symbol)
+    &quot;@CL.1&quot;, &quot;@GC.1&quot;, &quot;@NG.1&quot;,            # WTI, gold, natgas
+    &quot;EUR=&quot;, &quot;JPY=&quot;, &quot;GBP=&quot;,               # FX (verify symbols)
+    &quot;.N225&quot;, &quot;.HSI&quot;, &quot;.SSEC&quot;, &quot;.KS11&quot;,    # Asia
+    &quot;.GDAXI&quot;, &quot;.FTSE&quot;, &quot;.STOXX50E&quot;,       # Europe
+    &quot;XLK&quot;, &quot;XLF&quot;, &quot;XLE&quot;, &quot;XLU&quot;, &quot;XLP&quot;, &quot;XLY&quot;, &quot;XLI&quot;, &quot;XLB&quot;, &quot;XLV&quot;, &quot;XLC&quot;, &quot;XLRE&quot;,  # sector proxies
+]
+
+def cnbc_url(symbols):
+    q = urllib.parse.quote(&quot;|&quot;.join(symbols), safe=&quot;&quot;)
+    return (&quot;https://quote.cnbc.com/quote-html-webservice/quote.htm?symbols=&quot;
+            + q + &quot;&amp;requestMethod=itv&amp;exthrs=1&amp;output=json&quot;)
+
+def _http_get(url, timeout=12):
+    op = urllib.request.build_opener(urllib.request.HTTPSHandler(context=_CTX))
+    req = urllib.request.Request(url, headers=_UA)
+    with op.open(req, timeout=timeout) as f:
+        return f.read().decode(&quot;utf-8&quot;, &quot;replace&quot;)
+
+def cnbc_fetch(symbols, timeout=12):
+    try:
+        return parse_cnbc(_http_get(cnbc_url(symbols), timeout), symbols)
+    except Exception as e:
+        return {s: _na(s, f&quot;CNBC fetch failed: {type(e).__name__}&quot;) for s in symbols}
+
+def order_rows(rows_by_symbol, ordered_symbols):
+    return [rows_by_symbol[s] for s in ordered_symbols if s in rows_by_symbol]
+
+def build_ledger(ticker_symbols):
+    &quot;&quot;&quot;CNBC batch (tape + tickers) in one request. Deterministic output ordered
+    by input; any miss is an N/A row.&quot;&quot;&quot;
+    all_syms = TAPE_SYMBOLS + list(ticker_symbols)
+    rows = cnbc_fetch(all_syms)
+    return order_rows(rows, all_syms)
+
+_COLS = [&quot;symbol&quot;, &quot;prior_close&quot;, &quot;last&quot;, &quot;chg_pct&quot;, &quot;timestamp&quot;, &quot;source&quot;, &quot;quote_type&quot;]
+
+def format_markdown(ledger):
+    head = &quot;| &quot; + &quot; | &quot;.join(_COLS) + &quot; |&quot;
+    sep = &quot;| &quot; + &quot; | &quot;.join([&quot;---&quot;] * len(_COLS)) + &quot; |&quot;
+    body = [&quot;| &quot; + &quot; | &quot;.join(str(r.get(c, &quot;&quot;)) for c in _COLS) + &quot; |&quot; for r in ledger]
+    return &quot;\n&quot;.join([head, sep] + body)
+
+def read_watchlist(path):
+    syms = []
+    for line in open(path, encoding=&quot;utf-8&quot;):
+        line = line.strip()
+        if not line or line.startswith((&quot;#&quot;, &quot;*&quot;, &quot;&gt;&quot;)):
+            continue
+        for tok in line.replace(&quot;,&quot;, &quot; &quot;).split():
+            t = tok.strip().upper()
+            if t.isalpha() and 1 &lt;= len(t) &lt;= 5:
+                syms.append(t)
+    return sorted(set(syms))
+
+def main(argv=None):
+    argv = argv or sys.argv[1:]
+    sidecar = None
+    if &quot;--out&quot; in argv:
+        i = argv.index(&quot;--out&quot;); sidecar = argv[i + 1]; del argv[i:i + 2]
+    tickers = argv or read_watchlist(os.path.join(os.path.dirname(__file__), &quot;..&quot;, &quot;watchlist.md&quot;))
+    ledger = build_ledger(tickers)
+    if sidecar:
+        with open(sidecar, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
+            json.dump(ledger, f, indent=2)
+    print(format_markdown(ledger))
+    return 0
+
+if __name__ == &quot;__main__&quot;:
+    raise SystemExit(main())</code></pre>
+<ul class="chk">
+<li><strong>Step 4: Run tests, expect pass.</strong> Run: <code>python3 -m pytest tests/test_quote_ledger.py -q</code>. Expected: 5 passed.</li>
+</ul>
+<ul class="chk">
+<li><strong>Step 5: Live smoke test + verify the tape symbol map.</strong> Run: <code>python3 premarket-briefing-skill/scripts/fetch_market_data.py NVDA AAPL --out /tmp/ledger.json</code> and inspect: every <code>TAPE_SYMBOLS</code> entry should resolve to <code>PRE-MKT</code>/<code>PRIOR-CLOSE</code>, not <code>N/A</code>. For any tape symbol showing <code>N/A</code>, find its correct CNBC symbol (load <code>https://www.cnbc.com/markets/pre-markets/</code> and read the <code>/quotes/&lt;SYM&gt;</code> links) and fix <code>TAPE_SYMBOLS</code>; re-run until only legitimately-unavailable rows are <code>N/A</code>. Document any unresolved symbol with an inline comment.</li>
+</ul>
+<ul class="chk">
+<li><strong>Step 6: Commit.</strong></li>
+</ul>
+<pre><code>git add premarket-briefing-skill/scripts/fetch_market_data.py tests/test_quote_ledger.py
+git commit -m &quot;feat(premarket): CNBC-only ledger orchestration + CLI&quot;</code></pre>
+<hr>
+<h2>Task 3: The ledger validator</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>premarket-briefing-skill/scripts/validate_quote_ledger.py</code></li>
+<li>Test: <code>tests/test_quote_ledger.py</code></li>
+</ul>
+<ul class="chk">
+<li><strong>Step 1: Write the failing test</strong> (append):</li>
+</ul>
+<pre><code>import importlib
+vql = None
+def _load_vql():
+    global vql
+    if vql is None:
+        vql = importlib.import_module(&quot;validate_quote_ledger&quot;)
+    return vql
+
+LEDGER = [
+    {&quot;symbol&quot;: &quot;NVDA&quot;, &quot;last&quot;: 208.47, &quot;chg_pct&quot;: 0.51, &quot;quote_type&quot;: &quot;PRE-MKT&quot;},
+    {&quot;symbol&quot;: &quot;AVGO&quot;, &quot;last&quot;: 376.71, &quot;chg_pct&quot;: -4.37, &quot;quote_type&quot;: &quot;PRIOR-CLOSE&quot;},
+]
+
+def test_validator_passes_matching_tagged_numbers():
+    v = _load_vql()
+    md = (&quot;- **NVDA** +0.51% ($208.47) *(pre-mkt)* — bounce.\n&quot;
+          &quot;- **AVGO** -4.37% ($376.71) *(prior close)* — context.\n&quot;)
+    assert v.validate(md, LEDGER) == []
+
+def test_validator_fails_premkt_tag_without_premkt_row():
+    v = _load_vql()
+    md = &quot;- **AVGO** -4.37% ($376.71) *(pre-mkt)* — wrong tag.\n&quot;
+    assert any(&quot;AVGO&quot; in e and &quot;PRE-MKT&quot; in e for e in v.validate(md, LEDGER))
+
+def test_validator_fails_value_mismatch():
+    v = _load_vql()
+    md = &quot;- **NVDA** +0.51% ($222.00) *(pre-mkt)* — wrong price.\n&quot;
+    assert any(&quot;NVDA&quot; in e and &quot;208.47&quot; in e for e in v.validate(md, LEDGER))
+
+def test_validator_fails_untagged_number():
+    v = _load_vql()
+    md = &quot;- **NVDA** $208.47 — no tag.\n&quot;
+    assert any(&quot;no session tag&quot; in e.lower() for e in v.validate(md, LEDGER))
+
+def test_validator_group_tag_scopes_bullet():
+    v = _load_vql()
+    md = &quot;- Semis **(pre-mkt)**: NVDA +0.51% ($208.47), and others.\n&quot;
+    assert v.validate(md, LEDGER) == []</code></pre>
+<ul class="chk">
+<li><strong>Step 2: Run, expect failure.</strong> Run: <code>python3 -m pytest tests/test_quote_ledger.py -q</code>. Expected: FAIL (<code>No module named validate_quote_ledger</code>).</li>
+</ul>
+<ul class="chk">
+<li><strong>Step 3: Implement</strong> <code>validate_quote_ledger.py</code>:</li>
+</ul>
+<pre><code>&quot;&quot;&quot;Cross-check a saved premarket.md&#x27;s tagged numbers against the .quote-ledger.json
+sidecar. Exit 0 = clean; exit 1 = violations (printed to stderr).&quot;&quot;&quot;
+import json, re, sys
+
+TAG_RE = re.compile(r&quot;\((pre-mkt|prior close|n/a[^)]*)\)&quot;, re.I)
+TICKER_RE = re.compile(r&quot;\*\*([A-Z]{1,5})\*\*&quot;)
+PRICE_RE = re.compile(r&quot;\$(\d[\d,]*\.?\d*)&quot;)
+PCT_RE = re.compile(r&quot;([+\-−]\d+\.?\d*)%&quot;)
+
+def _tag_to_type(tag):
+    t = tag.lower()
+    if t.startswith(&quot;pre-mkt&quot;): return &quot;PRE-MKT&quot;
+    if t.startswith(&quot;prior&quot;):   return &quot;PRIOR-CLOSE&quot;
+    return &quot;N/A&quot;
+
+def validate(briefing_md, ledger):
+    by = {r[&quot;symbol&quot;]: r for r in ledger}
+    errors = []
+    for lineno, line in enumerate(briefing_md.splitlines(), 1):
+        nums = PRICE_RE.findall(line) + PCT_RE.findall(line)
+        if not nums:
+            continue
+        tag_m = TAG_RE.search(line)
+        if not tag_m:
+            errors.append(f&quot;line {lineno}: number(s) {nums} carry no session tag&quot;)
+            continue
+        qtype = _tag_to_type(tag_m.group(1))
+        for tkr in TICKER_RE.findall(line):
+            row = by.get(tkr)
+            if row is None:
+                continue
+            if qtype != &quot;N/A&quot; and row[&quot;quote_type&quot;] != qtype:
+                errors.append(f&quot;line {lineno}: {tkr} tagged ({tag_m.group(1)}) but ledger says {row[&#x27;quote_type&#x27;]}&quot;)
+            for p in PRICE_RE.findall(line):
+                val = float(p.replace(&quot;,&quot;, &quot;&quot;))
+                last = row.get(&quot;last&quot;)
+                if last is not None and abs(val - last) &gt; max(0.05, 0.005 * last):
+                    errors.append(f&quot;line {lineno}: {tkr} price ${val} != ledger {last}&quot;)
+    return errors
+
+def main(argv=None):
+    argv = argv or sys.argv[1:]
+    if len(argv) &lt; 2:
+        print(&quot;usage: validate_quote_ledger.py &lt;premarket.md&gt; &lt;ledger.json&gt;&quot;, file=sys.stderr)
+        return 2
+    briefing = open(argv[0], encoding=&quot;utf-8&quot;).read()
+    ledger = json.load(open(argv[1], encoding=&quot;utf-8&quot;))
+    errs = validate(briefing, ledger)
+    for e in errs:
+        print(&quot;LEDGER VIOLATION: &quot; + e, file=sys.stderr)
+    return 1 if errs else 0
+
+if __name__ == &quot;__main__&quot;:
+    raise SystemExit(main())</code></pre>
+<ul class="chk">
+<li><strong>Step 4: Run tests, expect pass.</strong> Run: <code>python3 -m pytest tests/test_quote_ledger.py -q</code>. Expected: 10 passed.</li>
+</ul>
+<ul class="chk">
+<li><strong>Step 5: Commit.</strong></li>
+</ul>
+<pre><code>git add premarket-briefing-skill/scripts/validate_quote_ledger.py tests/test_quote_ledger.py
+git commit -m &quot;feat(premarket): quote-ledger validator (tag/value/type cross-check)&quot;</code></pre>
+<hr>
+<h2>Task 4: PostToolUse hook wrapper</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>premarket-briefing-skill/scripts/validate_quote_hook.py</code></li>
+<li>Test: <code>tests/test_quote_ledger.py</code></li>
+</ul>
+<ul class="chk">
+<li><strong>Step 1: Write the failing test</strong> (append):</li>
+</ul>
+<pre><code>import subprocess
+
+HOOK = ROOT / &quot;premarket-briefing-skill&quot; / &quot;scripts&quot; / &quot;validate_quote_hook.py&quot;
+
+def _run_hook(event):
+    return subprocess.run([sys.executable, str(HOOK)], input=json.dumps(event),
+                          capture_output=True, text=True)
+
+def test_hook_ignores_non_premarket_write():
+    r = _run_hook({&quot;tool_name&quot;: &quot;Write&quot;, &quot;tool_input&quot;: {&quot;file_path&quot;: &quot;/x/notes.md&quot;}})
+    assert r.returncode == 0
+
+def test_hook_blocks_when_no_ledger(tmp_path):
+    bm = tmp_path / &quot;daily&quot; / &quot;2026-06-17&quot; / &quot;premarket.md&quot;
+    bm.parent.mkdir(parents=True); bm.write_text(&quot;- **NVDA** +0.51% ($208.47) *(pre-mkt)*\n&quot;)
+    r = _run_hook({&quot;tool_name&quot;: &quot;Write&quot;, &quot;tool_input&quot;: {&quot;file_path&quot;: str(bm)}})
+    assert r.returncode == 2
+    assert &quot;no ledger&quot; in (r.stdout + r.stderr).lower()
+
+def test_hook_passes_with_valid_ledger(tmp_path):
+    d = tmp_path / &quot;daily&quot; / &quot;2026-06-17&quot;; d.mkdir(parents=True)
+    (d / &quot;premarket.md&quot;).write_text(&quot;- **NVDA** +0.51% ($208.47) *(pre-mkt)*\n&quot;)
+    (d / &quot;.quote-ledger.json&quot;).write_text(json.dumps(
+        [{&quot;symbol&quot;: &quot;NVDA&quot;, &quot;last&quot;: 208.47, &quot;chg_pct&quot;: 0.51, &quot;quote_type&quot;: &quot;PRE-MKT&quot;}]))
+    r = _run_hook({&quot;tool_name&quot;: &quot;Write&quot;, &quot;tool_input&quot;: {&quot;file_path&quot;: str(d / &quot;premarket.md&quot;)}})
+    assert r.returncode == 0</code></pre>
+<ul class="chk">
+<li><strong>Step 2: Run, expect failure.</strong> Run: <code>python3 -m pytest tests/test_quote_ledger.py -q</code>. Expected: FAIL (hook file missing).</li>
+</ul>
+<ul class="chk">
+<li><strong>Step 3: Implement</strong> <code>validate_quote_hook.py</code>:</li>
+</ul>
+<pre><code>&quot;&quot;&quot;PostToolUse hook: gate every premarket.md write against its ledger sidecar.
+Exit 2 + stderr message = block (Claude Code surfaces it to the agent). Exit 0 = allow.
+Inert for any write that is not a daily/&lt;date&gt;/premarket.md.&quot;&quot;&quot;
+import json, os, re, sys
+
+sys.path.insert(0, os.path.dirname(__file__))
+import validate_quote_ledger as vql
+
+PATH_RE = re.compile(r&quot;/daily/\d{4}-\d{2}-\d{2}/premarket\.md$&quot;)
+
+def main():
+    try:
+        event = json.load(sys.stdin)
+    except Exception:
+        return 0
+    if event.get(&quot;tool_name&quot;) not in (&quot;Write&quot;, &quot;Edit&quot;):
+        return 0
+    path = (event.get(&quot;tool_input&quot;) or {}).get(&quot;file_path&quot;, &quot;&quot;)
+    if not PATH_RE.search(path.replace(os.sep, &quot;/&quot;)):
+        return 0
+    if not os.path.exists(path):
+        return 0
+    ledger_path = os.path.join(os.path.dirname(path), &quot;.quote-ledger.json&quot;)
+    if not os.path.exists(ledger_path):
+        print(&quot;BLOCK: no ledger sidecar (.quote-ledger.json) — run fetch_market_data.py &quot;
+              &quot;before writing the briefing; numbers cannot be verified.&quot;, file=sys.stderr)
+        return 2
+    briefing = open(path, encoding=&quot;utf-8&quot;).read()
+    ledger = json.load(open(ledger_path, encoding=&quot;utf-8&quot;))
+    errs = vql.validate(briefing, ledger)
+    if errs:
+        print(&quot;BLOCK: briefing numbers fail ledger validation:\n&quot; + &quot;\n&quot;.join(errs), file=sys.stderr)
+        return 2
+    return 0
+
+if __name__ == &quot;__main__&quot;:
+    raise SystemExit(main())</code></pre>
+<ul class="chk">
+<li><strong>Step 4: Run tests, expect pass.</strong> Run: <code>python3 -m pytest tests/test_quote_ledger.py -q</code>. Expected: 13 passed.</li>
+</ul>
+<ul class="chk">
+<li><strong>Step 5: Commit.</strong></li>
+</ul>
+<pre><code>git add premarket-briefing-skill/scripts/validate_quote_hook.py tests/test_quote_ledger.py
+git commit -m &quot;feat(premarket): PostToolUse hook wrapper for ledger validation&quot;</code></pre>
+<hr>
+<h2>Task 5: Register the hook in settings.json</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>.claude/settings.json</code></li>
+</ul>
+<ul class="chk">
+<li><strong>Step 1: Inspect current settings.</strong> Run: <code>cat .claude/settings.json 2&gt;/dev/null || echo &quot;{}&quot;</code>. Note any existing <code>hooks</code> key so it isn&#x27;t clobbered.</li>
+</ul>
+<ul class="chk">
+<li><strong>Step 2: Add the PostToolUse hook.</strong> Merge this into <code>.claude/settings.json</code> (preserve existing keys; <code>$CLAUDE_PROJECT_DIR</code> resolves to the repo root):</li>
+</ul>
+<pre><code>{
+  &quot;hooks&quot;: {
+    &quot;PostToolUse&quot;: [
+      {
+        &quot;matcher&quot;: &quot;Write|Edit&quot;,
+        &quot;hooks&quot;: [
+          {
+            &quot;type&quot;: &quot;command&quot;,
+            &quot;command&quot;: &quot;python3 \&quot;$CLAUDE_PROJECT_DIR/premarket-briefing-skill/scripts/validate_quote_hook.py\&quot;&quot;
+          }
+        ]
+      }
+    ]
+  }
+}</code></pre>
+<ul class="chk">
+<li><strong>Step 3: Verify hook fires + blocks.</strong> Confirm the block path with a throwaway briefing that has no ledger:</li>
+</ul>
+<pre><code>mkdir -p /tmp/hooktest/daily/2026-06-17
+echo &#x27;- **NVDA** +0.51% ($208.47) *(pre-mkt)*&#x27; &gt; /tmp/hooktest/daily/2026-06-17/premarket.md
+echo &#x27;{&quot;tool_name&quot;:&quot;Write&quot;,&quot;tool_input&quot;:{&quot;file_path&quot;:&quot;/tmp/hooktest/daily/2026-06-17/premarket.md&quot;}}&#x27; \
+  | python3 premarket-briefing-skill/scripts/validate_quote_hook.py; echo &quot;exit=$?&quot;</code></pre>
+<p>Expected: <code>BLOCK: no ledger sidecar …</code> and <code>exit=2</code>.</p>
+<ul class="chk">
+<li><strong>Step 4: Commit.</strong></li>
+</ul>
+<pre><code>git add .claude/settings.json
+git commit -m &quot;chore(premarket): register PostToolUse ledger-validation hook&quot;</code></pre>
+<hr>
+<h2>Task 6: SKILL.md + data-sources.md rewrite</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>premarket-briefing-skill/SKILL.md</code></li>
+<li>Modify: <code>premarket-briefing-skill/references/data-sources.md</code></li>
+</ul>
+<ul class="chk">
+<li><strong>Step 1: Rewrite Step 3a (market tape) in SKILL.md.</strong> Replace the browser-grep tape capture with: &quot;Run <code>python3 scripts/fetch_market_data.py &lt;watchlist symbols&gt; --out data/trade-journal/daily/&lt;US-date&gt;/.quote-ledger.json</code>. The script fetches the tape (futures, VIX/VXN, sectors, commodities, US yields, FX, global indices) and per-ticker quotes from CNBC JSON and writes the ledger sidecar + prints the markdown ledger. The browser pre-markets page is now a <strong>manual last-resort</strong> for numbers and remains the source for news/themes (Step 3b).&quot; Source the Tape Table from the ledger.</li>
+</ul>
+<ul class="chk">
+<li><strong>Step 2: Rewrite Step 3.5 in SKILL.md.</strong> Replace the finviz-anchor procedure with the three gates against the ledger: (1) pre-market gate — print as today&#x27;s move only if <code>quote_type==PRE-MKT</code>; a <code>PRIOR-CLOSE</code> row is tagged <code>(prior close)</code> or <code>N/A</code>; (2) symbol/class gate — the script echo-verifies, so quote only ledger symbols; (3) provenance gate — every body number comes from the ledger, never a WebSearch snippet or finviz price. State: the model consumes the printed ledger verbatim and never reads a price off a page.</li>
+</ul>
+<ul class="chk">
+<li><strong>Step 3: Add the output-tag convention to the template section.</strong> Every per-ticker and tape number carries <code>(pre-mkt)</code> / <code>(prior close)</code> / <code>(N/A — reason)</code>; group tags scope to their bullet. Include worked examples (NVDA <code>(pre-mkt)</code>, AVGO <code>(prior close)</code>, LUNR <code>(N/A — no pre-market quote)</code>).</li>
+</ul>
+<ul class="chk">
+<li><strong>Step 4: Add the final self-check items.</strong> Append to the Step 3.5 self-check: &quot;every number has a ledger row of the matching <code>quote_type</code>; every ticker matches the watchlist symbol exactly; no number traces to a WebSearch snippet; run <code>validate_quote_ledger.py &lt;briefing&gt; &lt;ledger&gt;</code> and fix/<code>N/A</code> any violation before presenting.&quot;</li>
+</ul>
+<ul class="chk">
+<li><strong>Step 5: Add the incident note.</strong> Under Step 3.5, add a dated note mirroring the existing NVDA-confabulation note:</li>
+</ul>
+<pre><code>**Why this step is scripted (the 2026-06-17 incident):** finviz&#x27;s free `quote.ashx`
+serves the prior *closed* session, so Tuesday&#x27;s close-to-close moves were printed as
+Wednesday &quot;pre-market&quot; (AAPL &quot;+0.95%&quot;, GOOGL &quot;+1.06%&quot; were the prior day). A cross-check
+then pulled a number from a WebSearch snippet that was the wrong share class — GOOG (Class C)
+for GOOGL (Class A). Fix: numbers now come only from the scripted CNBC ledger (exact-symbol
+verified, pre-market typed), and a validator + hook reject any unbacked number.</code></pre>
+<ul class="chk">
+<li><strong>Step 6: Reclassify sources in data-sources.md.</strong> finviz <code>quote.ashx</code> → &quot;headlines / analyst actions / earnings dates ONLY; its price is the prior session&#x27;s close — never the printed number.&quot; Add CNBC <code>quote.htm</code> JSON as the structured price/tape source (document the endpoint); note the browser CNBC pages as the manual last-resort. Split Section 1.4 &quot;net 2&quot;: finviz = the news/earnings sweep; the script = the price anchor. State WebSearch snippets are never a printed price.</li>
+</ul>
+<ul class="chk">
+<li><strong>Step 7: Run the full test suite.</strong> Run: <code>python3 -m pytest tests/ -q</code>. Expected: all pass (existing premarket/tag-canon/etc. + new <code>test_quote_ledger.py</code>). If any existing premarket test assumed finviz-as-price, update it to the ledger model.</li>
+</ul>
+<ul class="chk">
+<li><strong>Step 8: Commit.</strong></li>
+</ul>
+<pre><code>git add premarket-briefing-skill/SKILL.md premarket-briefing-skill/references/data-sources.md
+git commit -m &quot;docs(premarket): drive numbers from the scripted CNBC ledger; reclassify sources; incident note&quot;</code></pre>
+<hr>
+<h2>Task 7: Wire the ledger validator into the eval validator</h2>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>premarket-briefing-skill/evals/validators/validate_briefing.py</code></li>
+</ul>
+<ul class="chk">
+<li><strong>Step 1: Read the existing validator&#x27;s entry point.</strong> Run: <code>sed -n &#x27;1,40p&#x27; premarket-briefing-skill/evals/validators/validate_briefing.py</code> to see its <code>main()</code>/CLI shape and how it reports failures.</li>
+</ul>
+<ul class="chk">
+<li><strong>Step 2: Add an optional ledger cross-check.</strong> After its existing structural checks, if a <code>.quote-ledger.json</code> sits beside the briefing being validated, import and call the ledger validator and merge its errors into the existing failure list (match the file&#x27;s existing error-reporting style):</li>
+</ul>
+<pre><code># near the other checks, given `briefing_path` and the loaded `text`:
+import os, json
+_ledger = os.path.join(os.path.dirname(briefing_path), &quot;.quote-ledger.json&quot;)
+if os.path.exists(_ledger):
+    import importlib.util, pathlib
+    _spec = importlib.util.spec_from_file_location(
+        &quot;validate_quote_ledger&quot;,
+        pathlib.Path(__file__).resolve().parents[2] / &quot;scripts&quot; / &quot;validate_quote_ledger.py&quot;)
+    _vql = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(_vql)
+    errors.extend(_vql.validate(text, json.load(open(_ledger, encoding=&quot;utf-8&quot;))))</code></pre>
+<p>(Adapt variable names — <code>briefing_path</code>, <code>text</code>, <code>errors</code> — to whatever the existing file uses.)</p>
+<ul class="chk">
+<li><strong>Step 3: Run the suite.</strong> Run: <code>python3 -m pytest tests/ -q</code>. Expected: all pass.</li>
+</ul>
+<ul class="chk">
+<li><strong>Step 4: Commit.</strong></li>
+</ul>
+<pre><code>git add premarket-briefing-skill/evals/validators/validate_briefing.py
+git commit -m &quot;feat(premarket): eval validator picks up the quote-ledger cross-check&quot;</code></pre>
+<hr>
+<h2>Final verification</h2>
+<ul class="chk">
+<li>Run the whole suite: <code>python3 -m pytest tests/ -q</code> → all green.</li>
+<li>Live end-to-end: <code>python3 premarket-briefing-skill/scripts/fetch_market_data.py AAPL NVDA GOOGL --out /tmp/le.json</code> → ledger has no unexpected <code>N/A</code>; the GOOGL row is <code>GOOGL</code> (not <code>GOOG</code>).</li>
+<li>Confirm README CI badge stays green after push.</li>
+<li>Open a PR from <code>feat/premarket-deterministic-number-pipeline</code> (do not merge without user say-so).</li>
+</ul>
+</div></body></html>

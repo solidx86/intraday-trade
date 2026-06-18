@@ -1,0 +1,9 @@
+{"ITVQuoteResult":{"ITVQuote":[
+  {"symbol":"NVDA","previous_day_closing":"207.41","last":"207.41","change_pct":"0%","curmktstatus":"PRE_MKT",
+   "ExtendedMktQuote":{"type":"PRE_MKT","last":"208.47","change_pct":"+0.51%","last_timedate":"9:18 AM EDT","last_time":"2026-06-17T09:18:00-0400"}},
+  {"symbol":"GOOGL","previous_day_closing":"373.25","last":"373.25","change_pct":"0%","curmktstatus":"PRE_MKT",
+   "ExtendedMktQuote":{"type":"PRE_MKT","last":"371.34","change_pct":"-0.51%","last_timedate":"9:18 AM EDT","last_time":"2026-06-17T09:18:00-0400"}},
+  {"symbol":"AVGO","previous_day_closing":"393.94","last":"376.71","change_pct":"-4.37%","curmktstatus":"REG_MKT"},
+  {"symbol":"GOOG","previous_day_closing":"372.00","last":"372.00","change_pct":"0%","curmktstatus":"PRE_MKT",
+   "ExtendedMktQuote":{"type":"PRE_MKT","last":"370.00","change_pct":"-0.54%","last_timedate":"9:18 AM EDT","last_time":"2026-06-17T09:18:00-0400"}}
+]}}

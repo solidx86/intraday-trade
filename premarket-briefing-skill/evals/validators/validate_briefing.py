@@ -213,6 +213,26 @@ def check_spillover_read(sections: dict[str, str]) -> CheckResult:
     )
 
 
+def check_quote_ledger(briefing_path: Path, text: str) -> CheckResult:
+    """If a .quote-ledger.json sidecar sits beside the briefing, cross-check the
+    briefing's tagged numbers against it (same logic the PostToolUse hook runs).
+    Absent sidecar = skipped/pass — not every eval fixture ships a ledger."""
+    ledger_path = briefing_path.parent / ".quote-ledger.json"
+    if not ledger_path.exists():
+        return CheckResult("quote_ledger", True, "no ledger sidecar — skipped")
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "validate_quote_ledger",
+        Path(__file__).resolve().parents[2] / "scripts" / "validate_quote_ledger.py",
+    )
+    vql = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(vql)
+    errors = vql.validate(text, json.loads(ledger_path.read_text()))
+    if errors:
+        return CheckResult("quote_ledger", False, "; ".join(errors))
+    return CheckResult("quote_ledger", True, "all tagged numbers trace to the ledger")
+
+
 def run_all_checks(briefing_path: Path) -> list[CheckResult]:
     nonempty = check_file_nonempty(briefing_path)
     if not nonempty.passed:
@@ -229,6 +249,7 @@ def run_all_checks(briefing_path: Path) -> list[CheckResult]:
         check_econ_calendar(sections),
         check_global_spillover(sections),
         check_spillover_read(sections),
+        check_quote_ledger(briefing_path, text),
     ]
 
 
