@@ -64,6 +64,7 @@ TAPE_SYMBOLS = [
     "@SP.1", "@ND.1", "@DJ.1",           # futures (S&P / Nasdaq / Dow) — verified 2026-06-18
     ".VIX", ".VXN",                       # volatility
     "US10Y",                              # 10-yr yield (verify symbol)
+    ".DXY",                               # ICE US Dollar Index (cash) — feeds the regime read; verified 2026-06-22
     "@CL.1", "@GC.1", "@NG.1",            # WTI, gold, natgas
     "EUR=", "JPY=", "GBP=",               # FX (verify symbols)
     ".N225", ".HSI", ".SSEC", ".KS11",    # Asia
