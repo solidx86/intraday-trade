@@ -23,11 +23,20 @@ COIN, HOOD, MSTR
 ## Space / Defense
 PL, RKLB, LUNR, ASTS, SPCX
 
+## Aerospace / Defense (industrials)
+HWM
+
 ## Travel / Airlines
 DAL, LUV
 
 ## Energy / Materials
 FCX, BE
+
+## Healthcare / Pharma
+JNJ
+
+## Consumer / Restaurants
+EAT
 
 ## Other
 MRNA, GLW
