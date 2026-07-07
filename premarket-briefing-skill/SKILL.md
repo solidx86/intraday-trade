@@ -226,7 +226,7 @@ The 3 most important things happening in the market today:
 
 → [Alignment line. If mood and regime disagree, lead with **⚠️ MOOD/REGIME SPLIT** and fade/size-down guidance. If they agree, state the aligned posture — and in GREEDY/GOLDILOCKS fire the "don't short QQQ off a strong dollar" caveat. See references/macro-regime-read.md.]
 
-(Keep every bold stat line above — the four tape lines plus Market mood, Dollar/Yields regime, and the → line — blank-line separated. Without the blank lines markdown collapses them into one clumped paragraph.)
+(Keep every bold stat line above — the four tape lines, the Rotation map + Regime check lines, plus Market mood, Dollar/Yields regime, and the → line — blank-line separated. Without the blank lines markdown collapses them into one clumped paragraph.)
 
 (The four tape lines come from the Step 3a Tape Table. Each field is a real grepped number or `N/A — <reason>` — never a guessed figure. VIX tag: <15 calm · 15–20 normal · 20–25 elevated · >25 high.)
 

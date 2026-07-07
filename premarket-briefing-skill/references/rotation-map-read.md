@@ -45,6 +45,8 @@ usual sector labels when they are the material movers.
 - **Collapse** to the quiet-tape line when nothing clears the band (leadership is
   broad; dispersion is inside the band).
 
+Skip any group whose reg_chg_pct is blank/None; if SPY.reg_chg_pct itself is unavailable, collapse to the quiet-tape line.
+
 The **band** is the rotation materiality threshold. Apply the standardized value
 from the private framework supplement when it is loaded; absent it, use judgment —
 a group must be *meaningfully* beyond SPY for the session, not inside session
