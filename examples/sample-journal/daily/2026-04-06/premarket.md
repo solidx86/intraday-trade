@@ -17,6 +17,8 @@ The 3 most important things happening in the market today:
 **Futures (implied open):** ES +0.42% · NQ +0.74% · Dow +0.21% — firm into the open, semis leading the bid.
 **Volatility:** VIX 13.9 (−3.1%) · VXN 18.6 (−2.4%) — **calm**, no fear bid into the rally.
 **Sector tape:** Technology +1.3% lead · Staples −0.2% lag — money chasing the semi follow-through.
+**Rotation map (prior close):** OUT → staples, utilities · INTO → semis, small-caps — money leaving defensives is landing in growth / rate-cut beneficiaries.
+**Regime check:** GOLDILOCKS expects growth (QQQ) + rate-cut beneficiaries to lead; standing rotation confirms — no divergence.
 **Commodities:** WTI $68.4 · Gold $3,402 · NatGas $3.88 — quiet; no commodity story driving the tape.
 
 **Market mood:** **RISK-ON** — earnings tailwind plus easing yields; semis leading, breadth supportive pre-open.

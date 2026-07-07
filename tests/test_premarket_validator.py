@@ -239,3 +239,13 @@ def test_rotation_map_scoped_to_section_1_1_only():
         "## Quick Summary": "**Rotation map** and **Regime check:** mentioned elsewhere.\n",
     }
     assert not validate_briefing.check_rotation_map(sections).passed
+
+
+def test_run_all_checks_wires_in_rotation_map():
+    from journal_schema import journal_trees, premarket_files
+
+    sample = next(
+        f for tree in journal_trees() for f in premarket_files(tree)
+    )
+    results = validate_briefing.run_all_checks(sample)
+    assert "rotation_map" in {r.name for r in results}

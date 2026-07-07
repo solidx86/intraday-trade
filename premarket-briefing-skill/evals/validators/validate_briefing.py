@@ -9,9 +9,10 @@ Checks a generated premarket.md file against the skill's structural contract:
   5. Section 1.1 has a dollar/yields regime token (SCARED/GREEDY/GOLDILOCKS/NEUTRAL)
   6. Section 1.1 carries the four tape lines (Futures, Volatility, Sector tape,
      Commodities). A line reading "N/A — reason" counts as present.
-  7. Section 1.2 has impact labels OR the "Light calendar today" fallback
-  8. Global Spillover lists all required Asia/Europe indices + USD/JPY
-  9. Global Spillover closes with a → US Spillover Read block (a **Net:** line,
+  7. Section 1.1 carries a Rotation map + Regime check block (destination read)
+  8. Section 1.2 has impact labels OR the "Light calendar today" fallback
+  9. Global Spillover lists all required Asia/Europe indices + USD/JPY
+  10. Global Spillover closes with a → US Spillover Read block (a **Net:** line,
      or the 'no material spillover' benign-tape fallback)
 
 Exit code 0 if all pass, 1 otherwise.
@@ -263,6 +264,7 @@ def run_all_checks(briefing_path: Path) -> list[CheckResult]:
         check_seven_sections(sections, text),
         check_risk_verdict(sections),
         check_regime_read(sections),
+        check_rotation_map(sections),
         *check_tape_lines(sections),
         check_econ_calendar(sections),
         check_global_spillover(sections),
