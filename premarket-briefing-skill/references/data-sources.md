@@ -54,6 +54,7 @@ Tape table (CNBC ledger, fetched HH:MM MYT):
   Futures:    ES <fut> (±%)  · NQ <fut> (±%)  · Dow <fut> (±%)
   Volatility: VIX <lvl> (±%) · VXN <lvl> (±%)
   Sectors:    <leader> +x% … <laggard> −y%   (from the XL* sector-ETF rows)
+  Rotation:   rank all sector + rotation ETFs by reg_chg_pct − SPY.reg_chg_pct (prior-close basis); note top-3/bottom-3 groups   (see references/rotation-map-read.md)
   Commodities:WTI <lvl> · Gold <lvl> · NatGas <lvl>
   Yields/FX:  US10Y <%> · EUR/USD <lvl> · USD/JPY <lvl>
   Global:     Nikkei <±%> · HSI <±%> · Shanghai <±%> · KOSPI <±%> · DAX <±%> · FTSE <±%> · STOXX <±%>

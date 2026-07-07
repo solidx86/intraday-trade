@@ -99,6 +99,7 @@ Tape table (CNBC ledger, fetched HH:MM MYT):
   Futures:    ES <fut> (±%)  · NQ <fut> (±%)  · Dow <fut> (±%)
   Volatility: VIX <lvl> (±%) · VXN <lvl> (±%)
   Sectors:    <leader> +x% … <laggard> −y%   (from the XL* sector-ETF rows)
+  Rotation:   rank all sector + rotation ETFs by reg_chg_pct − SPY.reg_chg_pct (prior-close basis); note top-3/bottom-3 groups   (see references/rotation-map-read.md)
   Commodities:WTI <lvl> · Gold <lvl> · NatGas <lvl>
   Yields/FX:  US10Y <%> · EUR/USD <lvl> · USD/JPY <lvl>
   Global:     Nikkei <±%> · HSI <±%> · Shanghai <±%> · KOSPI <±%> · DAX <±%> · FTSE <±%> · STOXX <±%>
@@ -171,7 +172,7 @@ The Step 3a ledger **is** the price/quote anchor table. There is no separate man
 
 Use the exact template in the **Output template** section below. Preserve section order and heading text. The user has read this format many times — consistency matters more than creativity.
 
-Fill section 1.1's four tape lines (Futures, Volatility, Sector tape, Commodities) from the Step 3a Tape Table — real grepped numbers or `N/A — reason`. Then classify the dollar/yields regime per `references/macro-regime-read.md` and write the regime + alignment lines into section 1.1.
+Fill section 1.1's four tape lines (Futures, Volatility, Sector tape, Commodities) from the Step 3a Tape Table — real grepped numbers or `N/A — reason`. Then classify the dollar/yields regime per `references/macro-regime-read.md` and write the regime + alignment lines into section 1.1. Then build the **Rotation map + Regime check** block per `references/rotation-map-read.md` — rank the sector + rotation ETFs by `reg_chg_pct − SPY.reg_chg_pct` (prior-close basis), name the OUT/INTO groups that clear the materiality band (collapse to the quiet-tape line if none do), and flag regime divergence. This block names groups only — no numbers — so it adds no ledger-backed figures to the body.
 
 ### Step 5 — Save and render
 
@@ -215,6 +216,8 @@ The 3 most important things happening in the market today:
 **Futures (implied open):** ES [±%] · NQ [±%] · Dow [±%] *([pre-mkt/prior close])* — [one clause: firm / soft / mixed into the open]
 **Volatility:** VIX [lvl] ([±%]) · VXN [lvl] ([±%]) *([pre-mkt/prior close])* — **[calm / normal / elevated / high]**
 **Sector tape:** [leader] [+x%] lead · [laggard] [−y%] lag *([pre-mkt/prior close])* — [one clause: where the rotation is]
+**Rotation map (prior close):** OUT → [lagging groups] · INTO → [leading groups] — [money leaving <X> is landing in <Y>]   (collapse to: no material rotation — leadership broad, dispersion inside the band)
+**Regime check:** [regime] expects [expected leaders]; standing rotation [confirms / diverges] — [flag or "no divergence"]
 **Commodities:** WTI $[lvl] · Gold $[lvl] · NatGas $[lvl] *([pre-mkt/prior close])* — [one clause only if a move matters; else omit clause]
 
 **Market mood:** **RISK-ON** / **RISK-OFF** — [one sentence why]
