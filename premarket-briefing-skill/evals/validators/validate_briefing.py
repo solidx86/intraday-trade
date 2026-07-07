@@ -152,6 +152,24 @@ def check_regime_read(sections: dict[str, str]) -> CheckResult:
     )
 
 
+def check_rotation_map(sections: dict[str, str]) -> CheckResult:
+    body = sections.get("## 1.1 General Market News", "")
+    has_map = "**Rotation map" in body
+    has_regime = "**Regime check:**" in body
+    if has_map and has_regime:
+        return CheckResult("rotation_map", True, "rotation map + regime check present")
+    missing = []
+    if not has_map:
+        missing.append("Rotation map")
+    if not has_regime:
+        missing.append("Regime check")
+    return CheckResult(
+        "rotation_map",
+        False,
+        f"section 1.1 missing: {', '.join(missing)}",
+    )
+
+
 def check_tape_lines(sections: dict[str, str]) -> list[CheckResult]:
     """Each section-1.1 tape line must be present (a value or 'N/A — reason')."""
     body = sections.get("## 1.1 General Market News", "")
