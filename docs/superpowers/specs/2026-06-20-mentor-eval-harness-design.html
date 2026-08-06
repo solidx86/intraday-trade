@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Spec — Mentor Eval Harness (Promptfoo + Agent SDK)</title>
+<style>
+  :root { --ink:#1d2330; --muted:#5b6675; --line:#e1e6ee; --accent:#2b6cb0; --good:#2f855a; --warn:#b7791f; --bad:#c53030; --bg:#fbfcfe; --card:#fff; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--ink); background:var(--bg); }
+  .wrap { max-width:900px; margin:0 auto; padding:40px 28px 80px; }
+  h1 { font-size:28px; line-height:1.25; margin:0 0 6px; }
+  h2 { font-size:21px; margin:38px 0 12px; padding-bottom:6px; border-bottom:2px solid var(--line); }
+  h3 { font-size:16px; margin:22px 0 8px; color:var(--accent); }
+  p,li { color:var(--ink); }
+  .sub { color:var(--muted); margin:0 0 4px; }
+  code { background:#eef2f7; padding:1px 5px; border-radius:4px; font:13.5px/1.5 "SF Mono",Menlo,Consolas,monospace; }
+  pre { background:#0f172a; color:#e2e8f0; padding:14px 16px; border-radius:8px; overflow:auto; font:13px/1.55 "SF Mono",Menlo,Consolas,monospace; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px 18px; margin:12px 0; }
+  .meta { display:flex; flex-wrap:wrap; gap:8px 18px; color:var(--muted); font-size:14px; margin:10px 0 0; }
+  .pill { display:inline-block; font-size:12px; font-weight:600; padding:2px 9px; border-radius:999px; }
+  .pill.draft { background:#fef3c7; color:#92400e; }
+  .pill.local { background:#e0e7ff; color:#3730a3; }
+  table { border-collapse:collapse; width:100%; margin:10px 0; font-size:14.5px; }
+  th,td { border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; }
+  th { background:#f1f5fb; }
+  .flow { display:flex; flex-direction:column; gap:8px; margin:14px 0; }
+  .row { display:flex; gap:10px; align-items:stretch; flex-wrap:wrap; }
+  .box { flex:1; min-width:150px; background:#fff; border:1.5px solid var(--accent); border-radius:8px; padding:10px 12px; font-size:13.5px; }
+  .box b { display:block; font-size:13px; color:var(--accent); }
+  .box small { color:var(--muted); }
+  .arrow { text-align:center; color:var(--muted); font-size:18px; }
+  .good { color:var(--good); } .warn { color:var(--warn); } .bad { color:var(--bad); }
+  .tag { font-size:12px; color:var(--muted); }
+  ul.tight { margin:6px 0; } ul.tight li { margin:3px 0; }
+  .note { border-left:3px solid var(--accent); background:#f3f8fd; padding:8px 14px; margin:12px 0; border-radius:0 6px 6px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Mentor Eval Harness — Design Spec</h1>
+  <p class="sub">Full-fidelity evaluation of the <code>intraday-trade-mentor</code> skill, re-expressed in standard tooling.</p>
+  <div class="meta">
+    <span><span class="pill draft">DRAFT — for review</span></span>
+    <span><span class="pill local">LOCAL-ONLY instrument</span></span>
+    <span>Date: 2026-06-20</span>
+    <span>Owner: Solid</span>
+  </div>
+
+  <h2>1. Purpose &amp; context</h2>
+  <p>Build a <b>full-fidelity eval harness</b> for the <code>intraday-trade-mentor</code> skill that re-expresses its existing bespoke eval discipline (<code>intraday-trade-mentor-skill/evals/evals.json</code>) in <b>Promptfoo</b>, the industry-standard eval tool. This serves two slots of the AI-development skill plan at once:</p>
+  <ul class="tight">
+    <li><b>Phase 0 — toolchain standup:</b> stand up Promptfoo against a real, owned target.</li>
+    <li><b>Phase 1 — Track A case study:</b> "an eval you designed," with an LLM-as-judge <b>calibrated against your own human labels</b> and a reported agreement rate.</li>
+  </ul>
+  <p>The mentor grades against the <b>private</b> framework supplement (<code>data/framework/framework-full.md</code>) for exact parameter-level detail, degrading to a condensed public build when that mount is absent (<code>SKILL.md:246</code>). We are deliberately evaluating the <b>full (private) build</b> for fidelity — so this harness is a <b>local instrument</b>, not a clone-and-run public artifact.</p>
+  <div class="note">Portfolio value is preserved the way the rest of the repo already works: <b>harness/config public, framework + dataset private</b>. The deliverable a reviewer sees is the public Promptfoo config + a written case study + a screen-shared <code>promptfoo view</code> — not a runnable clone.</div>
+
+  <h2>2. Goals &amp; non-goals</h2>
+  <table>
+    <tr><th>Goals (v1)</th><th>Non-goals (v1 — deferred)</th></tr>
+    <tr><td>
+      <ul class="tight">
+        <li>Run the <b>real</b> mentor skill (full framework) headless, per case</li>
+        <li>Two-layer eval: deterministic structural/refusal asserts + subjective <code>llm-rubric</code> judge</li>
+        <li>Calibrate the judge against your <code>ground_truth</code> labels; report an agreement number</li>
+        <li>Legible standard-tool artifact (<code>promptfooconfig.yaml</code> + <code>promptfoo view</code>)</li>
+        <li>Prove discrimination on <b>3 iteration-1 cases</b></li>
+      </ul>
+    </td><td>
+      <ul class="tight">
+        <li>Public clone-and-run (private framework dep)</li>
+        <li>All 6 cases (expand after v1)</li>
+        <li>Multi-provider comparison (Claude only for now)</li>
+        <li>CI gating (local-only; cost + non-determinism + secrets)</li>
+        <li>Premarket online eval (component #2 / Langfuse)</li>
+        <li>RAG-triad / Ragas (Phase 1 Track B)</li>
+      </ul>
+    </td></tr>
+  </table>
+
+  <h2>3. Architecture &amp; data flow</h2>
+  <div class="flow">
+    <div class="row">
+      <div class="box"><b>Eval cases</b><small>3 of 6 from <code>evals.json</code>: CRM loss · SMH invalidation-exit · missing-4-cell. Prompt + image refs + ground_truth labels.</small></div>
+      <div class="box"><b>Promptfoo config</b><small><code>promptfooconfig.yaml</code> — cases as a dataset; <code>llm-rubric</code> asserts; points at the custom provider.</small></div>
+    </div>
+    <div class="arrow">│ Promptfoo calls the provider per case ▼</div>
+    <div class="row">
+      <div class="box"><b>Custom provider (shim)</b><small>Thin adapter: receives Promptfoo's case vars → invokes the driver → returns the mentor's critique text.</small></div>
+      <div class="box"><b>Agent-SDK driver</b><small>Runs the <b>real</b> mentor skill headless: loads SKILL.md + references + <b>private</b> <code>framework-full.md</code>, attaches screenshot(s) + trade text, returns the critique.</small></div>
+    </div>
+    <div class="arrow">│ mentor output ▼ (fans into two assertion layers)</div>
+    <div class="row">
+      <div class="box"><b>Layer 1 — pytest</b><small>Deterministic checks on the output: grade present, stops-before-reframe, refusal discipline, lesson citation, reflection section. Cheap, objective.</small></div>
+      <div class="box"><b>Layer 2 — Promptfoo <code>llm-rubric</code></b><small>Judge model scores the subjective critique against a rubric derived from each case's <code>ground_truth_summary</code>.</small></div>
+    </div>
+    <div class="arrow">▼</div>
+    <div class="row">
+      <div class="box"><b>Calibration</b><small>Your <code>ground_truth</code> grade = human label. Compare to judge verdict across cases → agreement rate.</small></div>
+      <div class="box"><b>Artifact</b><small><code>promptfoo view</code> dashboard (screenshot) + written Track-A case study.</small></div>
+    </div>
+  </div>
+
+  <h2>4. Components (interfaces &amp; dependencies)</h2>
+
+  <h3>4.1 Agent-SDK driver</h3>
+  <table>
+    <tr><th>Does</th><td>Runs one mentor critique end-to-end, headless, at full fidelity.</td></tr>
+    <tr><th>In</th><td>case = { skill dir, image path(s), trade-text prompt }</td></tr>
+    <tr><th>Out</th><td>raw mentor critique (markdown text)</td></tr>
+    <tr><th>Deps</th><td>Claude Agent SDK · <code>ANTHROPIC_API_KEY</code> · private <code>data/framework/framework-full.md</code> mount · the mentor skill files</td></tr>
+  </table>
+
+  <h3>4.2 Promptfoo custom provider (shim)</h3>
+  <table>
+    <tr><th>Does</th><td>Bridges Promptfoo ↔ driver so Promptfoo can "call the model."</td></tr>
+    <tr><th>In</th><td>Promptfoo prompt + vars (per case)</td></tr>
+    <tr><th>Out</th><td>driver output, in Promptfoo's expected provider-response shape</td></tr>
+    <tr><th>Deps</th><td>the driver (4.1)</td></tr>
+  </table>
+
+  <h3>4.3 Promptfoo config + llm-rubric</h3>
+  <table>
+    <tr><th>Does</th><td>Declares the 3 cases and the subjective judge rubric; runs the eval; renders the UI.</td></tr>
+    <tr><th>In</th><td>cases (prompt, image refs), rubric text per case</td></tr>
+    <tr><th>Out</th><td>per-case judge pass/fail + reason; <code>promptfoo view</code> dashboard</td></tr>
+    <tr><th>Deps</th><td>provider (4.2) · a grader model (Claude, temp 0)</td></tr>
+  </table>
+
+  <h3>4.4 pytest structural layer</h3>
+  <table>
+    <tr><th>Does</th><td>Deterministic asserts on the mentor's output (the public-safe, objective checks). Maps from <code>evals.json</code> assert types.</td></tr>
+    <tr><th>In</th><td>captured mentor output (per case)</td></tr>
+    <tr><th>Out</th><td>pass/fail</td></tr>
+    <tr><th>Deps</th><td>output capture from the driver run</td></tr>
+  </table>
+  <p class="tag">Note the boundary: this layer validates the <b>model's output</b>. It is distinct from the existing <code>tests/</code> that validate the <b>journal corpus schema</b> — those stay as-is.</p>
+
+  <h3>4.5 Calibration report</h3>
+  <table>
+    <tr><th>Does</th><td>Computes judge↔human agreement across the cases; the Track-A deliverable.</td></tr>
+    <tr><th>In</th><td>human labels (<code>ground_truth</code> grades) + judge verdicts</td></tr>
+    <tr><th>Out</th><td>agreement rate + a short written analysis</td></tr>
+    <tr><th>Deps</th><td>4.3 outputs · <code>evals.json</code> labels</td></tr>
+  </table>
+
+  <h2>5. Proposed repo layout</h2>
+  <pre>intraday-trade-mentor-skill/evals/
+  evals.json                 # unchanged — source of truth for cases + labels
+  assets/                    # unchanged — reuse the staged screenshots
+  promptfoo/
+    promptfooconfig.yaml     # NEW — 3 cases, llm-rubric, points at provider
+    provider.(py|js)         # NEW — custom provider shim (4.2)
+    driver.py                # NEW — Agent-SDK driver (4.1)
+    structural_test.py       # NEW — pytest layer (4.4)  [or under tests/]
+    calibration.md           # NEW — the agreement writeup (4.5)</pre>
+  <p class="tag">Public files stay token-only (leak test): refer to private parameters opaquely, never reproduce the operative values or the breakout tell-set.</p>
+
+  <h2>6. Error handling &amp; edge cases</h2>
+  <table>
+    <tr><th>Condition</th><th>Behaviour</th></tr>
+    <tr><td>Private framework mount absent</td><td><b>Fail loudly.</b> v1 requires the full build; do not silently run the degraded build and mislabel results.</td></tr>
+    <tr><td>Missing <code>ANTHROPIC_API_KEY</code></td><td>Clear error before any case runs.</td></tr>
+    <tr><td>Judge non-determinism</td><td>Grader at <b>temperature 0</b>; accept residual variance; calibration treats the judge as one noisy rater vs the human label.</td></tr>
+    <tr><td>Image load failure</td><td>Case errors explicitly (not a silent empty critique).</td></tr>
+    <tr><td>Cost</td><td>3 vision cases × small N — negligible; no batching needed in v1.</td></tr>
+    <tr><td>Python 3.14 vs SDK wheels</td><td>If the Agent SDK lags on 3.14, pin a <code>pyenv</code> 3.12 venv for the driver (per project memory note).</td></tr>
+  </table>
+
+  <h3>6.1 Execution &amp; secrets</h3>
+  <ul class="tight">
+    <li><b>Local-only run.</b> Both calls (driver + judge) hit the Claude API; the eval runs on your machine, never in GitHub CI (private framework + cost + non-determinism).</li>
+    <li><b>Key:</b> a single <b>root</b> <code>.env</code> (gitignored) holds <code>ANTHROPIC_API_KEY</code>. The driver loads it via <code>load_dotenv(find_dotenv())</code> (walks up to root); run Promptfoo from the repo root (<code>npx promptfoo eval -c &lt;path&gt;</code>) or pass <code>--env-path .env</code>.</li>
+    <li><b>CI unchanged:</b> GitHub keeps running the deterministic, key-less <code>pytest -q</code> journal-schema validation. Optional future CI signal = commit per-case output fixtures and run Layer-1 structural asserts on them (no key, no framework).</li>
+  </ul>
+
+  <h3>6.2 Documentation upkeep (deliverables)</h3>
+  <p>The harness ships with its docs so the repo stays self-explanatory. All of these are created together during implementation, not piecemeal:</p>
+  <table>
+    <tr><th>File</th><th>Change</th></tr>
+    <tr><td><code>.env.example</code> (root, committed)</td><td><b>NEW</b> — template: <code>ANTHROPIC_API_KEY=</code> + a one-line comment; the copy-to-<code>.env</code> source.</td></tr>
+    <tr><td><code>.gitignore</code></td><td>Confirm <code>.env</code> is ignored <b>and</b> <code>.env.example</code> is <b>not</b>.</td></tr>
+    <tr><td><code>README.md</code></td><td>Add an "Evals" section: what the mentor eval is, local-only, key setup, how to run.</td></tr>
+    <tr><td><code>intraday-trade-mentor-skill/evals/README.md</code></td><td>Note the Promptfoo re-expression + run steps, alongside the existing skill-creator runner.</td></tr>
+    <tr><td><code>docs/tasks.md</code></td><td>Log the eval-harness initiative in the public backlog.</td></tr>
+    <tr><td><code>CLAUDE.md</code></td><td>One line: eval-harness location + "key in root <code>.env</code>, never commit."</td></tr>
+  </table>
+  <p class="tag">All doc files stay token-only (leak test) — describe the harness, never the private parameters it grades against.</p>
+
+  <h2>7. Testing the harness itself</h2>
+  <p>The harness is "correct" when it <b>discriminates</b>: the two graded cases have known, opposite ground truths, so a working harness must separate them.</p>
+  <ul class="tight">
+    <li><span class="bad">CRM (loss)</span> — must land <b>D/F</b>, flag long-against-downtrend + sector-RS contradiction, cite the relevant lessons, stop before reframe.</li>
+    <li><span class="good">SMH (invalidation-exit)</span> — must land <b>A−/B+</b>, recognise a disciplined invalidation cut (<b>not</b> a fear exit).</li>
+    <li><span class="warn">Missing 4-cell</span> — must <b>refuse</b> to grade and ask for the missing input (short message, no grade).</li>
+  </ul>
+  <p>If Layer 1 + Layer 2 both pass on all three and the judge's verdicts match your labels, the harness works and the agreement number is meaningful.</p>
+
+  <h2>8. Success criteria (v1 "done")</h2>
+  <ul class="tight">
+    <li>The 3 cases run via the Agent-SDK driver at full fidelity.</li>
+    <li>Layer 1 (pytest) + Layer 2 (<code>llm-rubric</code>) both green and discriminating.</li>
+    <li>Judge calibrated against your labels, with a reported agreement rate.</li>
+    <li>A <code>promptfoo view</code> screenshot captured.</li>
+    <li>Written up as the Phase-1 Track A case study.</li>
+  </ul>
+
+  <h2>9. Risks &amp; open questions</h2>
+  <ul class="tight">
+    <li><b>Agent SDK ↔ skill loading (headless):</b> confirm the SDK loads the mentor skill <i>and</i> dynamically reads its references + private framework exactly as Claude Code does. Primary build risk.</li>
+    <li><b>Provider response shape:</b> confirm the custom-provider contract Promptfoo expects (so <code>llm-rubric</code> receives clean output text).</li>
+    <li><b>Small calibration N:</b> 3 (→6) cases demonstrate the <i>method</i>, not statistical robustness — state this explicitly in the writeup.</li>
+    <li><b>Eval staleness:</b> audit each case's <code>ground_truth</code> against current <code>SKILL.md</code> before trusting it as a label (tokens already verified present; semantics still to confirm).</li>
+  </ul>
+
+  <h2>10. Sequencing &amp; relationship to other work</h2>
+  <ol class="tight">
+    <li><b>Separate pre-task (not this spec):</b> refresh synthetic premarket examples (vintage tags + quantified figures) — portfolio hygiene, runs first, independent.</li>
+    <li><b>This spec:</b> mentor eval harness v1 (3 cases, Agent-SDK driver, two layers, calibration).</li>
+    <li><b>Later:</b> expand to all 6 cases → multi-provider → (Phase 2) promote the driver as the deployed Agent-SDK runtime → premarket online eval (#2) → RAG triad (Track B).</li>
+  </ol>
+
+</div>
+</body>
+</html>
