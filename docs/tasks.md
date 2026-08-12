@@ -47,16 +47,29 @@ literal string `UNCH`, so `_to_float("UNCH")` returns `None` and
 early tests and dies in real use, with no signal that anything went wrong.
 Measured against the live endpoint:
 
-| Sample | `reg_chg_pct` |
-|---|---|
-| 2026-08-12 06:59 ET | populated and correct (SPY −0.32 = Aug 11's 770.56 vs Aug 10's 773.03) |
-| 2026-08-12 09:26 ET | `None` for all sampled symbols |
-| 2026-08-11 09:27 ET | `None` for all 12 rotation ETFs |
+| Sample | `reg_chg_pct` | Meaning |
+|---|---|---|
+| 2026-08-12 06:59 ET | populated, correct | completed prior session (SPY −0.32 = Aug 11's 770.56 vs Aug 10's 773.03) |
+| 2026-08-12 09:26 ET | `None` | rolled to `UNCH` |
+| 2026-08-11 09:27 ET | `None` | same, 12/12 rotation ETFs |
+| 2026-08-12 09:36 ET | populated, **wrong** | today's live move (SPY 0.33) |
+| 2026-08-12 09:46 ET | populated, **wrong** | today's live move (SPY 0.28 — drifting while `chg_pct` stays frozen at 0.54) |
 
-The exact roll time is still unbounded between 07:00 and 09:26 ET — a probe
-intended to bracket it lost its window. Bracketing it is optional: the map is
-dead two days running in the near-open window the briefing is actually run in,
-which is enough to justify the fix.
+So the field passes through three phases: correct early in pre-market, `None`
+after CNBC's roll, then repopulated **with today's in-progress session** once the
+cash open passes.
+
+**The post-open phase is the dangerous one.** `reg_chg_pct` is non-`None`, so the
+map builds and prints a confident `**Rotation map (prior close):**` line computed
+from the first minutes of *today* — mislabelled at the source and plausible
+enough not to look wrong. That state is reachable through a documented workflow:
+SKILL.md Step 5 explicitly sanctions re-running the briefing near the open for a
+fresher snapshot. Sourcing the basis from IBKR daily bars removes the phase
+dependence entirely.
+
+The exact roll boundary is still unbounded between 07:00 and 09:26 ET — a probe
+meant to bracket it started too late. Bracketing it is optional; the field is
+unusable in two of three phases regardless.
 
 **Why the tests missed it.** The `_cnbc_json` fixture in
 `tests/test_fetch_market_data.py` builds `previous_day_closing=100.0, last=98.0,
