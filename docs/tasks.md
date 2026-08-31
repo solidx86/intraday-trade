@@ -27,10 +27,13 @@ monthly/quarterly rollups (20–60 trades) where hand-aggregation degrades. For
 **Trigger to revisit:** adding monthly/quarterly review horizons, or a recurring
 hand-fix of a wrong stat in a shipped weekly.
 
-## Rotation map is inert during pre-market (blocking — do not merge the branch)
+## Rotation map is inert during pre-market (merged with the defect open)
 
-**Status.** `feat/premarket-rotation-map` is **unmerged and must stay unmerged**
-until this is fixed. The suite is green (173 passed) and both sample briefings
+**Status.** Merged to `main` on 2026-08-31 (PR #5, merge commit `59d4b4d`) with
+this defect **known and unfixed** — a deliberate call to land the branch, not a
+sign the bug was resolved. **The §1.1 rotation line cannot be trusted until the
+IBKR basis below lands**; treat any rotation map the briefing prints as
+unverified until then. The suite is green (173 passed) and both sample briefings
 validate 14/14 including `rotation_map` — the tests pass against a payload shape
 CNBC never emits.
 
