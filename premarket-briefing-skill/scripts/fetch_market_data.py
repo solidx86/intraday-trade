@@ -16,7 +16,8 @@ def _to_float(s):
 
 def _na(symbol, note):
     return {"symbol": symbol, "quote_type": "N/A", "prior_close": None, "last": None,
-            "chg_pct": None, "timestamp": None, "source": "CNBC", "note": note}
+            "chg_pct": None, "reg_last": None, "reg_chg_pct": None,
+            "timestamp": None, "source": "CNBC", "note": note}
 
 def parse_cnbc(json_text, requested_symbols):
     """Map requested symbols -> ledger row. Symbol echo is verified: a requested
@@ -43,6 +44,10 @@ def parse_cnbc(json_text, requested_symbols):
             row = {"symbol": sym, "quote_type": "PRIOR-CLOSE", "prior_close": prior,
                    "last": _to_float(q.get("last")), "chg_pct": _to_float(q.get("change_pct")),
                    "timestamp": q.get("last_timedate"), "source": "CNBC", "note": ""}
+        # Completed regular-session move — captured for EVERY row (even PRE-MKT, which
+        # otherwise drops it), so the rotation map ranks on a uniform prior-close basis.
+        row["reg_last"] = _to_float(q.get("last"))
+        row["reg_chg_pct"] = _to_float(q.get("change_pct"))
         # CNBC sometimes echoes a symbol with an empty quote object (no price).
         # Treat that as a miss (N/A), never a None-valued row.
         if row["last"] is None:
@@ -70,6 +75,8 @@ TAPE_SYMBOLS = [
     ".N225", ".HSI", ".SSEC", ".KS11",    # Asia
     ".GDAXI", ".FTSE", ".STOXX50E",       # Europe
     "XLK", "XLF", "XLE", "XLU", "XLP", "XLY", "XLI", "XLB", "XLV", "XLC", "XLRE",  # sector proxies
+    "SMH", "XBI", "KRE", "XRT", "XHB", "PEJ", "JETS",   # rotation map: sub-industry
+    "RSP", "IWM", "USMV", "MTUM", "SPY",                # rotation map: factor/breadth + SPY benchmark
 ]
 
 def cnbc_url(symbols):
@@ -99,7 +106,7 @@ def build_ledger(ticker_symbols):
     rows = cnbc_fetch(all_syms)
     return order_rows(rows, all_syms)
 
-_COLS = ["symbol", "prior_close", "last", "chg_pct", "timestamp", "source", "quote_type"]
+_COLS = ["symbol", "prior_close", "last", "chg_pct", "reg_chg_pct", "timestamp", "source", "quote_type"]
 
 def format_markdown(ledger):
     head = "| " + " | ".join(_COLS) + " |"

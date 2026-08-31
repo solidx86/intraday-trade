@@ -206,3 +206,46 @@ def test_run_all_checks_wires_in_spillover_read():
     )
     results = validate_briefing.run_all_checks(sample)
     assert "spillover_read" in {r.name for r in results}
+
+
+# --- Rotation Map & Regime Check (section 1.1 synthesis blocks) -----------
+
+def test_rotation_map_passes_with_both_lines():
+    sections = {
+        SECTION_1_1: (
+            "**Sector tape:** XLK +0.5% lead · XLV -0.1% lag *(pre-mkt)*\n"
+            "**Rotation map (prior close):** OUT → semis · INTO → homebuilders — "
+            "money leaving semis is landing in rate-cut beneficiaries.\n"
+            "**Regime check:** GOLDILOCKS expects QQQ to lead; standing rotation "
+            "diverges — growth-scare undertone.\n"
+        )
+    }
+    assert validate_briefing.check_rotation_map(sections).passed
+
+
+def test_rotation_map_fails_without_regime_check():
+    sections = {SECTION_1_1: "**Rotation map (prior close):** no material rotation.\n"}
+    assert not validate_briefing.check_rotation_map(sections).passed
+
+
+def test_rotation_map_fails_without_map_line():
+    sections = {SECTION_1_1: "**Regime check:** GOLDILOCKS broadly aligned; no divergence flag.\n"}
+    assert not validate_briefing.check_rotation_map(sections).passed
+
+
+def test_rotation_map_scoped_to_section_1_1_only():
+    sections = {
+        SECTION_1_1: "**Market mood:** **RISK-ON** — no rotation block here.\n",
+        "## Quick Summary": "**Rotation map** and **Regime check:** mentioned elsewhere.\n",
+    }
+    assert not validate_briefing.check_rotation_map(sections).passed
+
+
+def test_run_all_checks_wires_in_rotation_map():
+    from journal_schema import journal_trees, premarket_files
+
+    sample = next(
+        f for tree in journal_trees() for f in premarket_files(tree)
+    )
+    results = validate_briefing.run_all_checks(sample)
+    assert "rotation_map" in {r.name for r in results}

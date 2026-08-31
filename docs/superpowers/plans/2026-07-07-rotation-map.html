@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan — Rotation Map (qualitative destination read) for the Pre-Market Briefing</title>
+<style>
+  :root {
+    --ink: #1a1f29; --muted: #5c6675; --line: #e2e6ec; --bg: #fbfcfd;
+    --accent: #1f6feb; --warn-bg: #fff4e5; --warn-bd: #f0c27a;
+    --good-bg: #eaf6ec; --good-bd: #a9d8b3; --code-bg: #f4f6f8;
+  }
+  * { box-sizing: border-box; }
+  body { font: 16px/1.62 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink); background: var(--bg); margin: 0; padding: 0; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 48px 28px 96px; }
+  h1 { font-size: 29px; line-height: 1.2; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 { font-size: 20px; margin: 40px 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--line); letter-spacing: -0.01em; }
+  h3 { font-size: 16.5px; margin: 26px 0 8px; padding: 8px 12px; background: #eef2f7; border-left: 3px solid var(--accent); border-radius: 4px; }
+  p, li { color: var(--ink); }
+  .meta { color: var(--muted); font-size: 14px; margin: 0 0 8px; }
+  .status { display: inline-block; background: var(--good-bg); border: 1px solid var(--good-bd);
+    color: #1e6b38; font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+  code { background: var(--code-bg); padding: 1.5px 5px; border-radius: 4px; font-size: 13px;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 13px 15px; overflow-x: auto; font-size: 12.5px; line-height: 1.5;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: #f0f3f7; font-weight: 600; }
+  .callout { border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 14px; }
+  .warn { background: var(--warn-bg); border: 1px solid var(--warn-bd); }
+  .good { background: var(--good-bg); border: 1px solid var(--good-bd); }
+  ul, ol { padding-left: 22px; } li { margin: 4px 0; }
+  .files li, .files { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+  .step { font-weight: 600; margin: 14px 0 4px; }
+  .tag { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  hr { border: none; border-top: 1px solid var(--line); margin: 36px 0; }
+  .note { color: var(--muted); font-size: 13.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Rotation Map — Implementation Plan (review companion)</h1>
+  <p class="meta"><strong>Date:</strong> 2026-07-07 &nbsp;·&nbsp; <strong>Skill:</strong> <code>premarket-briefing-skill</code> &nbsp;·&nbsp; <strong>Branch:</strong> <code>feat/premarket-rotation-map</code></p>
+  <p><span class="status">Ready to execute</span></p>
+  <p class="note">Execution source of truth is the Markdown twin
+  <code>docs/superpowers/plans/2026-07-07-rotation-map.md</code>. This HTML mirrors it for review — keep the two in sync.</p>
+
+  <p><strong>Goal:</strong> Add a qualitative <strong>Rotation map + Regime check</strong> block to section 1.1 that names the sector/factor <em>groups</em> money is leaving and entering, ranked on a uniform prior-close basis relative to SPY, enforced by the validator and proven by tests.</p>
+  <p><strong>Architecture:</strong> Widen the scripted CNBC tape with sub-industry + factor ETFs and capture each row's completed-session move (<code>reg_chg_pct</code>) for a uniform ranking basis; put the ranking / materiality / regime-divergence logic in a new reference the SKILL loads at write time (model-driven — no numbers reach the body); add two lines to the 1.1 template; enforce their presence with <code>check_rotation_map</code> + negative tests; conform the two sample briefings.</p>
+  <p><strong>Tech stack:</strong> Python 3 (stdlib), pytest, Markdown, JSON. &nbsp;<strong>Spec:</strong> <code>docs/superpowers/specs/2026-07-07-rotation-map-design.html</code></p>
+
+  <div class="callout warn"><span class="tag">Global constraints</span>
+    <ul>
+      <li><strong>Leak test:</strong> only the rotation <strong>materiality band</strong> is private (<code>data/framework/framework-full.md</code>, referenced opaquely); ETF list, plumbing, block format, group labels, rank-vs-SPY method stay public.</li>
+      <li><strong>No body numbers:</strong> the block names groups only — no <code>$</code>/<code>%</code>; the <code>(prior close)</code> is a basis note, not a per-number session tag, so the quote hook is untouched.</li>
+      <li><strong>Determinism:</strong> tape numbers come from the one scripted CNBC ledger; unresolved symbols emit <code>N/A</code>.</li>
+      <li><strong>Additive:</strong> the block sits under the existing <code>**Sector tape:**</code> line; section order/headings unchanged.</li>
+    </ul>
+  </div>
+
+  <h2>File structure</h2>
+  <ul class="files">
+    <li><strong>Create</strong> references/rotation-map-read.md — the read (tape set, labels, rank-vs-SPY, materiality/collapse, regime table, two-line format, leak test).</li>
+    <li><strong>Modify</strong> scripts/fetch_market_data.py — +12 ETFs; capture reg_last/reg_chg_pct on every row; reg_chg_pct column + N/A row.</li>
+    <li><strong>Create</strong> tests/test_fetch_market_data.py — reg_chg_pct preserved on PRE-MKT row; rotation symbols in tape.</li>
+    <li><strong>Modify</strong> evals/validators/validate_briefing.py — check_rotation_map + wire + docstring.</li>
+    <li><strong>Modify</strong> tests/test_premarket_validator.py — negative/unit + wired tests.</li>
+    <li><strong>Modify</strong> SKILL.md — Tape Table row, Step-4 build instruction, 1.1 template, reference link.</li>
+    <li><strong>Modify</strong> references/data-sources.md — sync mirrored Tape Table scratch.</li>
+    <li><strong>Modify</strong> examples/sample-journal/daily/2026-04-06 &amp; 2026-04-08 premarket.md — add the two lines.</li>
+    <li><strong>Modify</strong> evals/evals.json — one rubric assertion.</li>
+    <li><strong>(Private, optional)</strong> data/framework/framework-full.md — the numeric band.</li>
+  </ul>
+  <p class="note"><strong>Commit-green:</strong> the validator check is implemented (Task 3) before it is wired (Task 4); samples conformed in the wiring commit.</p>
+
+  <h2>Task 1 — Reference file <code>rotation-map-read.md</code></h2>
+  <p>Create the self-contained cheat sheet the skill loads at write time (same pattern as <code>macro-regime-read.md</code>). Full content is in the Markdown twin; key elements:</p>
+  <ul>
+    <li>Basis: last completed regular session, from <code>reg_chg_pct</code>; ranked <code>rel = reg_chg_pct − SPY.reg_chg_pct</code>.</li>
+    <li>Rotation-tape ETF → group label table (SMH=semis, XBI=biotech, XHB=homebuilders, KRE=regional banks, XRT=retail, PEJ=leisure/restaurants/cruise, JETS=airlines, RSP=breadth, IWM=small-caps, USMV=min-vol, MTUM=momentum, SPY=benchmark).</li>
+    <li>Materiality band (private-supplement value; else judgment); collapse when nothing clears it.</li>
+    <li>Regime → expected-leadership table (GOLDILOCKS / GREEDY / SCARED / REFLATION / NEUTRAL); divergence flag rule.</li>
+    <li>The two-line format (material + quiet), and the leak-test note.</li>
+  </ul>
+  <p class="step">Steps: 1) write the file · 2) leak-test · 3) commit <code>docs: add rotation-map-read reference for premarket briefing</code>.</p>
+
+  <h2>Task 2 — Widen the tape + capture the completed-session move</h2>
+  <p><strong>Interfaces produced:</strong> every ledger row carries <code>reg_last</code>/<code>reg_chg_pct</code> regardless of <code>quote_type</code>; <code>TAPE_SYMBOLS</code> includes the 12 ETFs; printed ledger has a <code>reg_chg_pct</code> column.</p>
+  <p class="step">Step 1 — failing unit tests (<code>tests/test_fetch_market_data.py</code>):</p>
+  <pre>def test_reg_session_captured_on_pre_mkt_row():
+    text = _cnbc_json("SMH", prev_close=100.0, reg_last=98.0, reg_chg=-2.0,
+                      premkt_last=99.0, premkt_chg=1.0)
+    row = fetch_market_data.parse_cnbc(text, ["SMH"])["SMH"]
+    assert row["quote_type"] == "PRE-MKT"
+    assert row["chg_pct"] == 1.0        # today's pre-market move
+    assert row["reg_chg_pct"] == -2.0   # yesterday's completed session
+    assert row["reg_last"] == 98.0
+
+def test_reg_session_captured_on_prior_close_row():
+    text = _cnbc_json("XBI", prev_close=90.0, reg_last=93.0, reg_chg=3.3)
+    row = fetch_market_data.parse_cnbc(text, ["XBI"])["XBI"]
+    assert row["quote_type"] == "PRIOR-CLOSE"
+    assert row["chg_pct"] == 3.3 and row["reg_chg_pct"] == 3.3
+
+def test_rotation_symbols_in_tape():
+    for sym in ["SMH","XBI","KRE","XRT","XHB","PEJ","JETS","RSP","IWM","USMV","MTUM","SPY"]:
+        assert sym in fetch_market_data.TAPE_SYMBOLS</pre>
+  <p class="note">(Helper <code>_cnbc_json(...)</code> builds a fake CNBC ITVQuote with an optional PRE_MKT ExtendedMktQuote — see the .md.)</p>
+  <p class="step">Step 2 — run, expect FAIL (KeyError <code>reg_chg_pct</code>).</p>
+  <p class="step">Step 3 — add ETFs to <code>TAPE_SYMBOLS</code>:</p>
+  <pre>    "XLK", ... "XLRE",  # sector proxies
+    "SMH", "XBI", "KRE", "XRT", "XHB", "PEJ", "JETS",   # rotation map: sub-industry
+    "RSP", "IWM", "USMV", "MTUM", "SPY",                # rotation map: factor/breadth + SPY benchmark
+]</pre>
+  <p class="step">Step 4 — capture the completed-session move on every row (after the if/else that assigns <code>row</code>, before the empty-price check):</p>
+  <pre>        # Completed regular-session move — captured for EVERY row (even PRE-MKT, which
+        # otherwise drops it), so the rotation map ranks on a uniform prior-close basis.
+        row["reg_last"] = _to_float(q.get("last"))
+        row["reg_chg_pct"] = _to_float(q.get("change_pct"))</pre>
+  <p class="step">Step 5 — add the keys to <code>_na()</code> (<code>reg_last: None, reg_chg_pct: None</code>) and insert <code>reg_chg_pct</code> into <code>_COLS</code> after <code>chg_pct</code>.</p>
+  <p class="step">Step 6 — run unit tests, expect PASS (3). Step 7 — <code>pytest -q</code> full suite green (ledger cross-check reads JSON by key; extra column ignored — if a column-set assert trips, extend that fixture). Step 8 — commit <code>feat: widen tape with rotation ETFs and capture completed-session move</code>.</p>
+
+  <h2>Task 3 — Validator check <code>check_rotation_map</code> (not yet wired)</h2>
+  <p><strong>Produces:</strong> <code>check_rotation_map(sections) -&gt; CheckResult</code> (name <code>"rotation_map"</code>); passes only when 1.1 has both a <code>**Rotation map</code> line and a <code>**Regime check:**</code> line.</p>
+  <p class="step">Step 1 — failing unit tests appended to <code>tests/test_premarket_validator.py</code>: passes with both lines; fails without regime check; fails without map line; fails when the substrings appear only outside 1.1 (scoped).</p>
+  <p class="step">Step 2 — run <code>-k rotation_map</code>, expect FAIL (AttributeError). Step 3 — implement, after <code>check_regime_read</code>:</p>
+  <pre>def check_rotation_map(sections: dict[str, str]) -> CheckResult:
+    body = sections.get("## 1.1 General Market News", "")
+    has_map = "**Rotation map" in body
+    has_regime = "**Regime check:**" in body
+    if has_map and has_regime:
+        return CheckResult("rotation_map", True, "rotation map + regime check present")
+    missing = []
+    if not has_map: missing.append("Rotation map")
+    if not has_regime: missing.append("Regime check")
+    return CheckResult("rotation_map", False, f"section 1.1 missing: {', '.join(missing)}")</pre>
+  <p class="step">Step 4 — run, expect PASS (4). Step 5 — full suite green (unwired). Step 6 — commit <code>feat: add check_rotation_map validator check with unit tests</code>.</p>
+
+  <h2>Task 4 — Wire the check in + conform samples (single green commit)</h2>
+  <p class="step">Step 1 — add the wired test:</p>
+  <pre>def test_run_all_checks_wires_in_rotation_map():
+    sample = next(f for tree in journal_trees() for f in premarket_files(tree))
+    results = validate_briefing.run_all_checks(sample)
+    assert "rotation_map" in {r.name for r in results}</pre>
+  <p class="step">Step 2 — run, expect FAIL. Step 3 — wire <code>check_rotation_map(sections)</code> into <code>run_all_checks</code> right after <code>check_regime_read(sections)</code>; add docstring item 7 and renumber.</p>
+  <p class="step">Step 4 — conform 2026-04-06 (insert under the Sector tape line):</p>
+  <pre>**Rotation map (prior close):** OUT → staples, utilities · INTO → semis, small-caps — money leaving defensives is landing in growth / rate-cut beneficiaries.
+**Regime check:** GOLDILOCKS expects growth (QQQ) + rate-cut beneficiaries to lead; standing rotation confirms — no divergence.</pre>
+  <p class="step">Step 5 — conform 2026-04-08:</p>
+  <pre>**Rotation map (prior close):** OUT → energy, cyclicals · INTO → utilities, min-vol — money leaving cyclicals is landing in defensives ahead of CPI.
+**Regime check:** NEUTRAL sets no strong leadership expectation; standing rotation broadly aligned — no divergence flag.</pre>
+  <p class="step">Step 6 — <code>pytest -q</code> green. Step 7 — commit <code>feat: enforce rotation map in validator and conform sample briefings</code>.</p>
+
+  <h2>Task 5 — SKILL.md: Tape Table, build instruction, template, link</h2>
+  <p class="step">Step 1 — add a <code>Rotation:</code> row to the Step 3a Tape Table scratch (rank all sector + rotation ETFs by <code>reg_chg_pct − SPY.reg_chg_pct</code>, note top-3/bottom-3; see the reference). Step 2 — sync the mirror in <code>references/data-sources.md</code>.</p>
+  <p class="step">Step 3 — append the build instruction to Step 4 (build the Rotation map + Regime check per the reference; name OUT/INTO groups clearing the band, collapse if none, flag divergence; groups only, no numbers).</p>
+  <p class="step">Step 4 — add the two template lines under the <code>**Sector tape:**</code> line:</p>
+  <pre>**Rotation map (prior close):** OUT → [lagging groups] · INTO → [leading groups] — [money leaving <X> is landing in <Y>]   (collapse to: no material rotation — leadership broad, dispersion inside the band)
+**Regime check:** [regime] expects [expected leaders]; standing rotation [confirms / diverges] — [flag or "no divergence"]</pre>
+  <p class="step">Step 5 — consistency read (formula matches reference; template substrings match the validator's <code>**Rotation map</code> / <code>**Regime check:**</code>). Step 6 — commit <code>feat: wire rotation map into briefing SKILL.md template and tape table</code>.</p>
+
+  <h2>Task 6 — Eval rubric line</h2>
+  <p>Insert into <code>evals.json</code> eval <code>id: 1</code> assertions, after the regime-read object:</p>
+  <pre>{
+  "text": "Section 1.1 includes a Rotation map (prior close) line naming OUT/INTO groups plus a Regime check line, or collapses to the 'no material rotation' quiet-tape line; the block names groups only and prints no price or percent.",
+  "type": "qualitative"
+},</pre>
+  <p class="step">Validate JSON; commit <code>test: add rotation-map assertion to premarket eval rubric</code>.</p>
+
+  <h2>Task 7 — Final verification</h2>
+  <ul>
+    <li><code>pytest -q</code> all green.</li>
+    <li>Validator against both samples → <code>Overall: PASS</code>, with <code>rotation_map</code> among passed checks.</li>
+    <li>Live fetch → each of the 12 ETFs prints a row with non-<code>N/A</code> <code>reg_chg_pct</code> during/after a US session; any <code>N/A</code> is recorded, non-blocking, never guessed.</li>
+    <li>Final leak-test + format-consistency read.</li>
+  </ul>
+
+  <h2>Task 8 (private, optional) — standardize the materiality band</h2>
+  <p>Only if the gitignored <code>data/framework/</code> symlink is present. Add the band value to <code>framework-full.md</code> and commit in the <strong>private</strong> repo. v1 already degrades to model judgment without it — a hardening step, not a blocker.</p>
+
+  <hr>
+  <div class="callout good"><span class="tag">Self-review</span>
+    <ul>
+      <li><strong>Coverage:</strong> every spec section (§A–§D + leak test) maps to a task.</li>
+      <li><strong>No placeholders:</strong> literal code/JSON in every code step; sample edits use exact find/replace strings captured from the files.</li>
+      <li><strong>Name consistency:</strong> <code>reg_chg_pct</code>/<code>reg_last</code>, <code>check_rotation_map</code>/<code>"rotation_map"</code>, and the substrings <code>**Rotation map</code> / <code>**Regime check:**</code> are identical across the check, template, and samples.</li>
+      <li><strong>Commit-green:</strong> check before wiring; samples conformed in the wiring commit; fetch column verified against the full suite.</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

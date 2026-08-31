@@ -38,5 +38,8 @@ JNJ
 ## Consumer / Restaurants
 EAT
 
+## Consumer / Retail
+TJX, ROST
+
 ## Other
 MRNA, GLW

@@ -9,9 +9,10 @@ Checks a generated premarket.md file against the skill's structural contract:
   5. Section 1.1 has a dollar/yields regime token (SCARED/GREEDY/GOLDILOCKS/NEUTRAL)
   6. Section 1.1 carries the four tape lines (Futures, Volatility, Sector tape,
      Commodities). A line reading "N/A — reason" counts as present.
-  7. Section 1.2 has impact labels OR the "Light calendar today" fallback
-  8. Global Spillover lists all required Asia/Europe indices + USD/JPY
-  9. Global Spillover closes with a → US Spillover Read block (a **Net:** line,
+  7. Section 1.1 carries a Rotation map + Regime check block (destination read)
+  8. Section 1.2 has impact labels OR the "Light calendar today" fallback
+  9. Global Spillover lists all required Asia/Europe indices + USD/JPY
+  10. Global Spillover closes with a → US Spillover Read block (a **Net:** line,
      or the 'no material spillover' benign-tape fallback)
 
 Exit code 0 if all pass, 1 otherwise.
@@ -152,6 +153,24 @@ def check_regime_read(sections: dict[str, str]) -> CheckResult:
     )
 
 
+def check_rotation_map(sections: dict[str, str]) -> CheckResult:
+    body = sections.get("## 1.1 General Market News", "")
+    has_map = "**Rotation map" in body
+    has_regime = "**Regime check:**" in body
+    if has_map and has_regime:
+        return CheckResult("rotation_map", True, "rotation map + regime check present")
+    missing = []
+    if not has_map:
+        missing.append("Rotation map")
+    if not has_regime:
+        missing.append("Regime check")
+    return CheckResult(
+        "rotation_map",
+        False,
+        f"section 1.1 missing: {', '.join(missing)}",
+    )
+
+
 def check_tape_lines(sections: dict[str, str]) -> list[CheckResult]:
     """Each section-1.1 tape line must be present (a value or 'N/A — reason')."""
     body = sections.get("## 1.1 General Market News", "")
@@ -245,6 +264,7 @@ def run_all_checks(briefing_path: Path) -> list[CheckResult]:
         check_seven_sections(sections, text),
         check_risk_verdict(sections),
         check_regime_read(sections),
+        check_rotation_map(sections),
         *check_tape_lines(sections),
         check_econ_calendar(sections),
         check_global_spillover(sections),

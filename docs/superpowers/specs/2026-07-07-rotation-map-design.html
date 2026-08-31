@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design — Rotation Map (qualitative destination read) for the Pre-Market Briefing</title>
+<style>
+  :root {
+    --ink: #1a1f29; --muted: #5c6675; --line: #e2e6ec; --bg: #fbfcfd;
+    --accent: #1f6feb; --warn-bg: #fff4e5; --warn-bd: #f0c27a;
+    --good-bg: #eaf6ec; --good-bd: #a9d8b3; --code-bg: #f4f6f8;
+    --out: #c0392b; --into: #1e8a4c; --neutral: #6b7280;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font: 16px/1.62 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink); background: var(--bg); margin: 0; padding: 0;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 48px 28px 96px; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 { font-size: 21px; margin: 44px 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--line); letter-spacing: -0.01em; }
+  h3 { font-size: 17px; margin: 28px 0 8px; }
+  p, li { color: var(--ink); }
+  .meta { color: var(--muted); font-size: 14px; margin: 0 0 8px; }
+  .status { display: inline-block; background: var(--good-bg); border: 1px solid var(--good-bd);
+    color: #1e6b38; font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+  code { background: var(--code-bg); padding: 1.5px 5px; border-radius: 4px; font-size: 13.5px;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px 16px; overflow-x: auto; font-size: 13px; line-height: 1.5;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14.5px; }
+  th, td { border: 1px solid var(--line); padding: 8px 11px; text-align: left; vertical-align: top; }
+  th { background: #f0f3f7; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .callout { border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 14.5px; }
+  .warn { background: var(--warn-bg); border: 1px solid var(--warn-bd); }
+  .good { background: var(--good-bg); border: 1px solid var(--good-bd); }
+  .tok { font-weight: 700; }
+  .tok.out { color: var(--out); } .tok.into { color: var(--into); } .tok.n { color: var(--neutral); }
+  ul, ol { padding-left: 22px; }
+  li { margin: 4px 0; }
+  .files li { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 13.5px; }
+  .lede { font-size: 17px; color: var(--muted); margin: 0 0 8px; }
+  hr { border: none; border-top: 1px solid var(--line); margin: 40px 0; }
+  .tag { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Rotation Map — qualitative destination read for the Pre-Market Briefing</h1>
+  <p class="meta"><strong>Date:</strong> 2026-07-07 &nbsp;·&nbsp; <strong>Skill:</strong> <code>premarket-briefing-skill</code> &nbsp;·&nbsp; <strong>Branch:</strong> <code>feat/premarket-rotation-map</code></p>
+  <p><span class="status">Approved design — ready for implementation plan</span></p>
+
+  <h2>Problem</h2>
+  <p>The briefing is excellent at naming <em>what is breaking</em> and <em>why</em> (the macro cause and
+  the weak sector) but structurally blind to <em>where the money is going</em> — the destination of a
+  rotation. Section 1.1 reports sector leadership as a single <code>Sector tape: [leader] lead ·
+  [laggard] lag</code> pair drawn from the eleven broad GICS SPDRs, and nothing synthesises the
+  handoff.</p>
+  <p>Concretely: for the week into 2026-07-02 the briefings nailed the semis/memory breakdown and the
+  weak-labour → rate-cut pivot, but on 2026-07-02 the sector line read <em>"XLK lead · XLV lag — tech
+  leading"</em> and stopped there — while beneath that bounce, rate-cut beneficiaries (homebuilders,
+  small-caps, biotech innovators) were already taking leadership. The defensive-leadership rotation the
+  trader cared about was invisible.</p>
+  <p>Two root causes:</p>
+  <ul>
+    <li><strong>The tape is too coarse.</strong> Rotation shows up first in sub-industry and factor ETFs
+      (semis vs tech, biotech vs pharma, homebuilders, small-caps, min-vol), not the eleven broad
+      sectors.</li>
+    <li><strong>The watchlist is tech-tilted.</strong> Destination leadership emerging outside it
+      (off-price retail, cruise, biotech) can't surface through the per-ticker scan — so widening the
+      <em>tape</em> (unbiased, free — one batched call) is the fix, not widening the watchlist.</li>
+  </ul>
+  <p>There is also a data hazard the design must respect: sector/factor ETF pre-market prints are thin or
+  absent, so ranking them on this-morning gaps (when they exist) against yesterday's closes (when they
+  don't) is an apples-to-oranges error that produces a <em>wrong</em> destination call — worse than
+  none.</p>
+
+  <h2>Goals</h2>
+  <ul>
+    <li>Add a <strong>qualitative Rotation Map</strong> to section 1.1 that names the <em>groups</em>
+      money is leaving and entering — the Tier-2 (industry) destination read — plus a regime-divergence
+      flag. <strong>No raw percentages in the body</strong>, so the number-provenance hook is untouched.</li>
+    <li>Widen the tape with sub-industry + factor ETFs so the destination is <em>visible at all</em>.</li>
+    <li>Rank on a <strong>uniform completed-session basis</strong> so the call is correct by construction,
+      not corrupted by thin pre-market prints.</li>
+    <li>Measure rotation as <strong>dispersion around SPY</strong>, so it stays correct on broad up/down
+      days (who truly leads, not merely who is green).</li>
+    <li>Keep the change additive and format-consistent; ship the smallest thing that catches the destination.</li>
+  </ul>
+
+  <h2>Background — the read (one screen)</h2>
+  <p>This is Tier 2 of the standard top-down funnel (macro → <strong>industry</strong> → company).
+  Rotation is a <em>multi-session, full-volume, close-to-close</em> flow phenomenon — not an overnight
+  gap. So the map reads the <strong>last completed regular session</strong>, and it measures each group
+  <em>relative to SPY</em> (rotation = dispersion around the index). Pre-market is the wrong input: thin
+  ETF liquidity makes it noise, and overnight index beta compresses the very dispersion the map exists to
+  measure.</p>
+  <p>The one place today's pre-market <em>does</em> belong is the <strong>regime check</strong>: the
+  freshly-classified dollar/yields regime (already computed in 1.1) sets an <em>expected</em> leadership;
+  when the standing prior-close rotation contradicts it, that divergence is the signal — e.g. a dovish
+  <span class="tok n">GOLDILOCKS</span> tape that "should" lift QQQ + cyclicals while defensives quietly
+  lead = a growth-scare undertone under a relief bounce. The block is deliberately mixed-basis:
+  <em>prior-close rotation vs today-pre-market regime</em>, and the contrast is the value.</p>
+
+  <h2>Design</h2>
+
+  <h3>A. Data layer — <code>scripts/fetch_market_data.py</code></h3>
+  <p><strong>A1. Widen <code>TAPE_SYMBOLS</code></strong> with twelve symbols (all plain US ETFs → resolve
+  AAPL-style; verified once against the live CNBC endpoint per the file's existing note — any that don't
+  resolve emit <code>N/A</code>, non-blocking):</p>
+  <ul class="files">
+    <li>Sub-industry — SMH, XBI, KRE, XRT, XHB, PEJ, JETS</li>
+    <li>Factor / breadth — RSP, IWM, USMV, MTUM</li>
+    <li>Benchmark — SPY</li>
+  </ul>
+  <p><strong>A2. Capture the completed-session move on every row.</strong> Today the <code>PRE_MKT</code>
+  branch overwrites <code>chg_pct</code> with the pre-market move and drops the regular-session number.
+  Add to <em>both</em> branches, so every symbol carries a uniform prior-close basis:</p>
+  <pre>row["reg_last"]    = _to_float(q.get("last"))        # last completed session close
+row["reg_chg_pct"] = _to_float(q.get("change_pct"))  # that session's % — uniform across all symbols</pre>
+  <p><code>chg_pct</code> still carries today's pre-market for the existing <code>Sector tape:</code>
+  line. Add <code>reg_chg_pct</code> to the printed-ledger columns so the model can read it for the
+  ranking. <strong>Verify</strong> <code>validate_quote_ledger.py</code>, <code>validate_quote_hook.py</code>
+  and <code>pytest</code> don't pin an exact ledger column-set (if they do, extend the fixture — no logic
+  change).</p>
+
+  <h3>B. Compute layer — model-driven in <code>SKILL.md</code></h3>
+  <p>The script supplies data only; the ranking / gating / divergence logic lives in <code>SKILL.md</code>
+  as instructions the model applies when composing 1.1 — mirroring how the existing sector leader/laggard
+  line is already model-derived from ledger rows. Because v1 emits <strong>no numbers</strong>, there is no
+  fabrication risk to guard against; a deterministic scoring script is deferred to a follow-up.</p>
+  <ul>
+    <li><strong>Ranking:</strong> for each rotation-tape ETF, <code>rel = reg_chg_pct − SPY.reg_chg_pct</code>.
+      <span class="tok into">INTO</span> = groups with <code>rel ≥ +T</code>; <span class="tok out">OUT</span>
+      = <code>rel ≤ −T</code>; collapse when nothing clears the band.</li>
+    <li><strong>Materiality band <code>T</code></strong> lives in <code>data/framework/framework-full.md</code>
+      (private), referenced opaquely from public <code>SKILL.md</code>.</li>
+    <li><strong>ETF → group labels</strong> (descriptive, public): SMH=semis, XBI=biotech, XHB=homebuilders,
+      KRE=regional banks, XRT=retail, PEJ=leisure/restaurants/cruise, JETS=airlines, RSP=equal-weight/breadth,
+      IWM=small-caps, USMV=min-vol/defensive, MTUM=momentum.</li>
+    <li><strong>Regime divergence</strong> reuses <code>references/cross-asset-matrix.md</code>'s per-regime
+      expected leadership. A small enrichment pass gives every regime token
+      (<span class="tok n">SCARED / GREEDY / GOLDILOCKS / NEUTRAL</span> + REFLATION) an explicit
+      expected-leaders / laggards row. The flag fires when standing <span class="tok into">INTO</span>
+      groups sit in the regime's <em>expected-laggard</em> set (or vice-versa).</li>
+  </ul>
+
+  <h3>C. Render layer — the 1.1 block</h3>
+  <p>Directly under the existing <code>**Sector tape:**</code> line, always present, two bold lines:</p>
+  <pre>**Rotation map (prior close):** OUT &rarr; [lagging groups] &middot; INTO &rarr; [leading groups] &mdash; [money leaving &lt;X&gt; is landing in &lt;Y&gt;]
+**Regime check:** [today pre-mkt regime] expects [expected leaders]; standing rotation [confirms / diverges] &mdash; [flag or "no divergence"]</pre>
+  <p>Quiet-tape collapse (nothing clears the SPY-relative band):</p>
+  <pre>**Rotation map (prior close):** no material rotation &mdash; leadership broad, dispersion inside the band.
+**Regime check:** [regime] broadly aligned; no divergence flag.</pre>
+  <p><code>(prior close)</code> here is a <strong>basis note</strong> — the whole block reads yesterday's
+  session, distinct from the pre-market <code>Sector tape:</code> line above it. The lines carry group
+  <em>names</em>, no <code>$</code>/<code>%</code>, so the number-tag hook never fires on them.</p>
+  <div class="callout good"><span class="tag">Worked example — a 2026-07-02-type tape</span><br>
+    <code>Rotation map (prior close):</code> <span class="tok out">OUT &rarr;</span> semis, neocloud &middot;
+    <span class="tok into">INTO &rarr;</span> homebuilders, small-caps, biotech — money leaving semis is
+    landing in rate-cut beneficiaries.<br>
+    <code>Regime check:</code> <span class="tok n">GOLDILOCKS</span> expects QQQ + cyclicals to lead;
+    standing rotation <strong>diverges</strong> — defensives leading under a dovish tape = growth-scare
+    undertone.</div>
+
+  <h3>D. Testing, hygiene, rollout</h3>
+  <ul>
+    <li><strong>Tests:</strong> <code>pytest -q</code> stays green; extend the ledger fixture only if a
+      column-set assertion trips. Add a validator presence-check for the two new 1.1 lines (mirroring the
+      existing tape-line checks) so CI guards the format, proven by a negative unit test.</li>
+    <li><strong>Hygiene (leak test):</strong> the threshold <code>T</code> → private framework; everything
+      else (symbols, plumbing, block format, group labels, rank-vs-SPY method) is generic market structure
+      → public.</li>
+    <li><strong>Rollout:</strong> one live fetch to confirm the twelve symbols resolve; regenerate the next
+      session's briefing and eyeball the map; no hook change (no body numbers).</li>
+  </ul>
+
+  <h2>Decisions locked (brainstorming)</h2>
+  <table>
+    <thead><tr><th>Fork</th><th>Choice</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Scope</td><td>Qualitative map (v1)</td><td>Catches the destination without dragging ETF %s through the number hook</td></tr>
+      <tr><td>Rank basis</td><td>New internal <code>reg_chg_pct</code> field</td><td>Uniform prior-close basis → correct by construction; numbers stay internal</td></tr>
+      <tr><td>Footprint</td><td>Compact 2-line block, always present</td><td>Format-consistent; collapses on quiet tape; extensible for rung 2</td></tr>
+      <tr><td>Materiality</td><td>Relative to SPY, band <code>T</code></td><td>Rotation = dispersion around the index; correct on broad days; <code>T</code> stays private</td></tr>
+      <tr><td>Logic placement</td><td>Model-driven in SKILL.md</td><td>v1 emits no numbers → no fabrication risk; mirrors existing sector-tape derivation</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Out of scope (deferred to rung 2 / 3)</h2>
+  <ul>
+    <li>Numeric breadth line (RSP−SPY, IWM, USMV−SPY spreads in pp) — needs the ledger determinism
+      contract + hook to accept the reg-session field as body-number provenance.</li>
+    <li>Trailing 5-day relative-strength history store — measures rotation as a multi-session trend rather
+      than a single prior close; adds persistence + a fetch-cadence decision.</li>
+    <li>A deterministic rotation-scorer script + artifact — hardening if the qualitative call proves flaky.</li>
+    <li>A "Rotation Radar" watchlist tier — the widened tape covers destination detection; a few
+      representative leaders (ROST, RCL, VRTX…) for per-name colour can follow if wanted.</li>
+  </ul>
+
+  <div class="callout warn"><span class="tag">Leak test</span><br>
+    Passes for the public skill. The only methodology parameter — the materiality band <code>T</code> —
+    lives in the private framework supplement and is referenced opaquely. ETF tickers, the
+    <code>reg_chg_pct</code> plumbing, the block format, the descriptive ETF→group labels, and the
+    rank-vs-SPY method are generic market structure; naming SMH=semis or "rank vs SPY" reconstructs no
+    proprietary edge.</div>
+
+  <hr>
+  <p class="meta"><strong>Self-review:</strong> no placeholders; decisions table matches the design
+  sections; scope is a single implementation plan (rungs 2/3 explicitly deferred); the mixed-basis
+  hazard and the prior-close-vs-pre-market basis are stated unambiguously. Ready for the implementation
+  plan.</p>
+
+</div>
+</body>
+</html>
